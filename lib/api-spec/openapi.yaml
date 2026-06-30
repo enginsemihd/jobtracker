@@ -1,0 +1,630 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: JobTrack API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: applications
+    description: Job application operations
+  - name: profile
+    description: User profile operations
+  - name: ai
+    description: AI tailoring operations
+  - name: jobs
+    description: Job search operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [applications]
+      summary: List all job applications
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+    post:
+      operationId: createApplication
+      tags: [applications]
+      summary: Create a new job application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationInput"
+      responses:
+        "201":
+          description: Created application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}:
+    get:
+      operationId: getApplication
+      tags: [applications]
+      summary: Get a specific job application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      operationId: updateApplication
+      tags: [applications]
+      summary: Update a job application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationUpdate"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteApplication
+      tags: [applications]
+      summary: Delete a job application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /applications/{id}/status:
+    patch:
+      operationId: updateApplicationStatus
+      tags: [applications]
+      summary: Update just the status of an application (for Kanban drag-and-drop)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /applications/{id}/tailored-content:
+    get:
+      operationId: getTailoredContent
+      tags: [applications]
+      summary: Get saved AI-tailored content for an application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tailored content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailoredContent"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      operationId: saveTailoredContent
+      tags: [applications]
+      summary: Save edited AI-tailored content alongside an application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TailoredContentInput"
+      responses:
+        "200":
+          description: Saved tailored content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailoredContent"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [applications]
+      summary: Get summary stats for the dashboard
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/follow-ups:
+    get:
+      operationId: getOverdueFollowUps
+      tags: [applications]
+      summary: Get applications with overdue follow-up dates
+      responses:
+        "200":
+          description: List of applications needing follow-up
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      operationId: upsertProfile
+      tags: [profile]
+      summary: Create or update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /ai/tailor:
+    post:
+      operationId: tailorMaterials
+      tags: [ai]
+      summary: Use Claude to tailor resume bullets, cover letter, and ATS keywords for a job application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TailorRequest"
+      responses:
+        "200":
+          description: Tailored materials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailorResult"
+        "400":
+          description: Bad request (missing profile or job description)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /jobs/search:
+    get:
+      operationId: searchJobs
+      tags: [jobs]
+      summary: Search all matching jobs across Jooble, Adzuna, Remotive, and RemoteOK (paginated, deduplicated)
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: remote
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Job listings merged from all configured sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobListing"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        roleTitle:
+          type: string
+        country:
+          type: ["string", "null"]
+        jobPostingUrl:
+          type: ["string", "null"]
+        jobDescription:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [Saved, Applied, Interviewing, Offer, Rejected, Withdrawn]
+        source:
+          type: string
+        applicationMethod:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        followUpDate:
+          type: ["string", "null"]
+        dateAdded:
+          type: string
+          format: date-time
+        dateApplied:
+          type: ["string", "null"]
+      required:
+        - id
+        - companyName
+        - roleTitle
+        - status
+        - source
+        - dateAdded
+
+    ApplicationInput:
+      type: object
+      properties:
+        companyName:
+          type: string
+        roleTitle:
+          type: string
+        country:
+          type: string
+        jobPostingUrl:
+          type: string
+        jobDescription:
+          type: string
+        status:
+          type: string
+          enum: [Saved, Applied, Interviewing, Offer, Rejected, Withdrawn]
+        source:
+          type: string
+        applicationMethod:
+          type: string
+        notes:
+          type: string
+        followUpDate:
+          type: string
+        dateApplied:
+          type: string
+      required:
+        - companyName
+        - roleTitle
+
+    ApplicationUpdate:
+      type: object
+      properties:
+        companyName:
+          type: string
+        roleTitle:
+          type: string
+        country:
+          type: string
+        jobPostingUrl:
+          type: string
+        jobDescription:
+          type: string
+        status:
+          type: string
+          enum: [Saved, Applied, Interviewing, Offer, Rejected, Withdrawn]
+        source:
+          type: string
+        applicationMethod:
+          type: string
+        notes:
+          type: string
+        followUpDate:
+          type: string
+        dateApplied:
+          type: string
+
+    StatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Saved, Applied, Interviewing, Offer, Rejected, Withdrawn]
+      required:
+        - status
+
+    TailoredContent:
+      type: object
+      properties:
+        id:
+          type: integer
+        applicationId:
+          type: integer
+        resumeBullets:
+          type: ["string", "null"]
+        coverLetterParagraph:
+          type: ["string", "null"]
+        atsKeywords:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - applicationId
+        - updatedAt
+
+    TailoredContentInput:
+      type: object
+      properties:
+        resumeBullets:
+          type: string
+        coverLetterParagraph:
+          type: string
+        atsKeywords:
+          type: string
+
+    DashboardStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        appliedThisWeek:
+          type: integer
+        upcomingFollowUps:
+          type: integer
+        overdueFollowUps:
+          type: integer
+        responseRate:
+          type: number
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - total
+        - appliedThisWeek
+        - upcomingFollowUps
+        - overdueFollowUps
+        - responseRate
+        - byStatus
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: integer
+        resumeText:
+          type: ["string", "null"]
+        keySkills:
+          type: ["string", "null"]
+        careerSummary:
+          type: ["string", "null"]
+        pastRoles:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - updatedAt
+
+    ProfileInput:
+      type: object
+      properties:
+        resumeText:
+          type: string
+        keySkills:
+          type: string
+        careerSummary:
+          type: string
+        pastRoles:
+          type: string
+
+    TailorRequest:
+      type: object
+      properties:
+        applicationId:
+          type: integer
+      required:
+        - applicationId
+
+    TailorResult:
+      type: object
+      properties:
+        resumeBullets:
+          type: string
+        coverLetterParagraph:
+          type: string
+        atsKeywords:
+          type: string
+      required:
+        - resumeBullets
+        - coverLetterParagraph
+        - atsKeywords
+
+    JobListing:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        company:
+          type: string
+        location:
+          type: string
+        country:
+          type: ["string", "null"]
+        salary:
+          type: ["string", "null"]
+        source:
+          type: string
+          enum: [Jooble, Adzuna, Remotive, RemoteOK, ISKUR]
+        postedAt:
+          type: ["string", "null"]
+        jobUrl:
+          type: string
+        snippet:
+          type: ["string", "null"]
+        isRemote:
+          type: boolean
+      required:
+        - id
+        - title
+        - company
+        - location
+        - source
+        - jobUrl
+        - isRemote
