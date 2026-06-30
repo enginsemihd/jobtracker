@@ -104,8 +104,16 @@ function adzunaSupports(country: string): boolean {
   return ADZUNA_COUNTRY_CODES[country.toLowerCase()] !== undefined;
 }
 
+const ADZUNA_JOB_TYPE: Record<string, Record<string, string>> = {
+  "full-time":  { full_time: "1" },
+  "part-time":  { part_time: "1" },
+  "contract":   { contract:  "1" },
+  // Adzuna has no internship filter — we fall back to keyword-based
+};
+
 async function fetchAdzuna(
-  keyword: string, country: string, remoteOnly: boolean, maxDaysOld?: number, city?: string
+  keyword: string, country: string, remoteOnly: boolean,
+  maxDaysOld?: number, city?: string, jobType?: string,
 ): Promise<JobListing[]> {
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
@@ -114,6 +122,9 @@ async function fetchAdzuna(
 
   const code = ADZUNA_COUNTRY_CODES[country.toLowerCase()] ?? "gb";
   const where = remoteOnly ? "remote" : (city ?? undefined);
+  // For internship Adzuna has no filter — append to keyword so results are still relevant
+  const what = jobType === "internship" ? `${keyword} internship` : keyword;
+  const typeParams = jobType ? (ADZUNA_JOB_TYPE[jobType] ?? {}) : {};
   const out: JobListing[] = [];
 
   try {
@@ -122,9 +133,10 @@ async function fetchAdzuna(
         app_id: appId,
         app_key: appKey,
         results_per_page: String(PAGE_SIZE),
-        what: keyword,
+        what,
         ...(where ? { where } : {}),
         ...(maxDaysOld !== undefined ? { max_days_old: String(maxDaysOld) } : {}),
+        ...typeParams,
       });
       const res = await fetch(
         `https://api.adzuna.com/v1/api/jobs/${code}/search/${page}?${params}`,
@@ -264,11 +276,20 @@ async function fetchRemoteOK(keyword: string): Promise<JobListing[]> {
 // workTypes:
 //   "1" = On-site, "2" = Remote, "3" = Hybrid (comma-separated for multiple)
 // LinkedIn's f_TPR is in seconds: maxDaysOld * 86400.
+// LinkedIn f_JT job type codes
+const LI_JOB_TYPE: Record<string, string> = {
+  "full-time":  "F",
+  "part-time":  "P",
+  "internship": "I",
+  "contract":   "C",
+};
+
 async function fetchLinkedIn(
   keyword: string,
   location: string,
   workTypes: string,   // e.g. "2,3" for Remote+Hybrid
   maxDaysOld?: number,
+  jobType?: string,
 ): Promise<JobListing[]> {
   const LI_PAGE_SIZE = 25;
   const out: JobListing[] = [];
@@ -282,6 +303,7 @@ async function fetchLinkedIn(
       const params = new URLSearchParams({ keywords: keyword, location, start: String(start) });
       if (workTypes) params.set("f_WT", workTypes);
       if (timeSeconds) params.set("f_TPR", `r${timeSeconds}`);
+      if (jobType && LI_JOB_TYPE[jobType]) params.set("f_JT", LI_JOB_TYPE[jobType]);
 
       const res = await fetch(
         `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?${params}`,
@@ -374,7 +396,7 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     return;
   }
 
-  const { keyword, country = "", remote, hybrid, city, maxDaysOld } = parsed.data;
+  const { keyword, country = "", remote, hybrid, city, jobType, maxDaysOld } = parsed.data;
   const remoteOnly = remote === "true";
   const hybridOnly = hybrid === "true";
 
@@ -388,7 +410,7 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   // LinkedIn location: prefer "City, Country" when both are provided.
   const liLocation = city && country ? `${city}, ${country}` : city ?? country;
 
-  const cacheKey = `${keyword}|${country}|${city ?? ""}|${remoteOnly}|${hybridOnly}|${maxDaysOld ?? ""}|${MAX_PAGES_PER_SOURCE}|${MAX_RESULTS_PER_SOURCE}`;
+  const cacheKey = `${keyword}|${country}|${city ?? ""}|${remoteOnly}|${hybridOnly}|${jobType ?? ""}|${maxDaysOld ?? ""}|${MAX_PAGES_PER_SOURCE}|${MAX_RESULTS_PER_SOURCE}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     res.json(cached.data);
@@ -402,11 +424,11 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
 
   const [jooble, adzuna, iskur, remotive, remoteOK, linkedin] = await Promise.allSettled([
     fetchJooble(keyword, country, remoteOnly, city),
-    fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city),
+    fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city, jobType),
     isTurkey ? fetchIskur(keyword, country) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemotive(keyword) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemoteOK(keyword) : Promise.resolve([]),
-    liLocation ? fetchLinkedIn(keyword, liLocation, liWorkTypes, maxDaysOld) : Promise.resolve([]),
+    liLocation ? fetchLinkedIn(keyword, liLocation, liWorkTypes, maxDaysOld, jobType) : Promise.resolve([]),
   ]);
 
   const all: JobListing[] = [

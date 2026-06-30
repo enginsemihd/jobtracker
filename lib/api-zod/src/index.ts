@@ -85,5 +85,6 @@ export const SearchJobsQueryParams = z.object({
   city: z.string().optional(),
   remote: z.enum(["true", "false"]).optional(),
   hybrid: z.enum(["true", "false"]).optional(),
+  jobType: z.enum(["full-time", "part-time", "internship", "contract"]).optional(),
   maxDaysOld: z.coerce.number().int().min(1).max(90).optional(),
 });
