@@ -28,6 +28,37 @@ const JOB_TYPES = [
   { value: "contract",   label: "Contract" },
 ];
 
+// Words the user might type in the keyword that are actually job-type filters.
+// We strip them from the keyword and merge them into the jobType param so
+// e.g. "data engineer internship" → keyword="data engineer" + jobType="internship".
+const JOB_TYPE_ALIASES: Record<string, string> = {
+  internship: "internship",
+  intern:     "internship",
+  "full-time": "full-time",
+  fulltime:    "full-time",
+  "full time": "full-time",
+  "part-time": "part-time",
+  parttime:    "part-time",
+  "part time": "part-time",
+  contract:    "contract",
+  freelance:   "contract",
+};
+
+function parseKeyword(raw: string): { cleanKeyword: string; inferredJobType: string | null } {
+  let kw = raw.trim();
+  let inferredJobType: string | null = null;
+  for (const [alias, type] of Object.entries(JOB_TYPE_ALIASES)) {
+    const escaped = alias.replace(/[-]/g, "\\-");
+    const regex = new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "i");
+    if (regex.test(kw)) {
+      kw = kw.replace(regex, " ").replace(/\s+/g, " ").trim();
+      inferredJobType = type;
+      break;
+    }
+  }
+  return { cleanKeyword: kw || raw.trim(), inferredJobType };
+}
+
 const SOURCE_COLORS: Record<string, string> = {
   Jooble:   "bg-blue-100 text-blue-700 border-blue-200",
   Adzuna:   "bg-violet-100 text-violet-700 border-violet-200",
@@ -84,12 +115,16 @@ export default function JobSearch() {
     setAppliedIds(new Set());
 
     try {
-      const params = new URLSearchParams({ keyword: keyword.trim() });
+      const { cleanKeyword, inferredJobType } = parseKeyword(keyword);
+      // jobType dropdown wins; fall back to inferred type from keyword text
+      const effectiveJobType = jobType !== "any" ? jobType : inferredJobType;
+
+      const params = new URLSearchParams({ keyword: cleanKeyword });
       if (country && country !== "Any") params.set("country", country);
       if (city.trim()) params.set("city", city.trim());
       if (remoteOnly) params.set("remote", "true");
       if (hybridOnly) params.set("hybrid", "true");
-      if (jobType !== "any") params.set("jobType", jobType);
+      if (effectiveJobType) params.set("jobType", effectiveJobType);
       if (thisWeekOnly) params.set("maxDaysOld", "7");
 
       const res = await fetch(`/api/jobs/search?${params}`);

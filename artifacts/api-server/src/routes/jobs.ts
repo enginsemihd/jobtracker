@@ -231,8 +231,11 @@ async function fetchRemotive(keyword: string): Promise<JobListing[]> {
 // ─── RemoteOK (single feed, raise slice to act as fetch-all) ─────────────────
 async function fetchRemoteOK(keyword: string): Promise<JobListing[]> {
   try {
-    const tag = keyword.toLowerCase().replace(/\s+/g, "-");
-    const res = await fetch(`https://remoteok.com/api?tags=${encodeURIComponent(tag)}`, {
+    // RemoteOK accepts comma-separated tags. Split the keyword into individual
+    // words so "data engineer" becomes "data,engineer" rather than the single
+    // non-existent tag "data-engineer".
+    const tags = keyword.toLowerCase().trim().split(/\s+/).join(",");
+    const res = await fetch(`https://remoteok.com/api?tags=${encodeURIComponent(tags)}`, {
       headers: { "User-Agent": "JobTrack/1.0 (personal job search app)" },
       signal: AbortSignal.timeout(10000),
     });
