@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @workspace/api-server add cheerio)",
+      "PowerShell(npm install *)"
+    ]
+  }
+}

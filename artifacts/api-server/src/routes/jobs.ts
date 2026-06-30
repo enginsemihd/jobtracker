@@ -403,12 +403,13 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   const remoteOnly = remote === "true";
   const hybridOnly = hybrid === "true";
 
-  // Build LinkedIn work-type filter string from remote/hybrid flags.
-  // Empty string = all work types (LinkedIn default).
-  const liWorkTypes = [
-    ...(remoteOnly ? ["2"] : []),
-    ...(hybridOnly ? ["3"] : []),
-  ].join(",");
+  // LinkedIn work-type filter.
+  // When a city is set we want on-site + hybrid + remote (all Warsaw-relevant
+  // results) so we only restrict to remote-only when that flag is explicit.
+  // Empty string = no filter = all work types.
+  const liWorkTypes = city
+    ? (remoteOnly ? "2" : "")          // city search: all types unless explicitly remote-only
+    : (remoteOnly ? "2" : hybridOnly ? "2,3" : "");
 
   // LinkedIn location: prefer "City, Country" when both are provided.
   const liLocation = city && country ? `${city}, ${country}` : city ?? country;
