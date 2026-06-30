@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateApplication, getListApplicationsQueryKey, getGetDashboardStatsQueryKey } from "@workspace/api-client-react";
-import { Search, Loader2, MapPin, Building2, ExternalLink, BookmarkPlus, Check, Wifi, AlertCircle } from "lucide-react";
+import { Search, Loader2, MapPin, Building2, ExternalLink, BookmarkPlus, Check, Wifi, AlertCircle, CalendarDays, GitMerge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +50,7 @@ const SOURCE_COLORS: Record<string, string> = {
   Remotive: "bg-emerald-100 text-emerald-700 border-emerald-200",
   RemoteOK: "bg-orange-100 text-orange-700 border-orange-200",
   ISKUR: "bg-rose-100 text-rose-700 border-rose-200",
+  LinkedIn: "bg-sky-100 text-sky-700 border-sky-200",
 };
 
 interface JobListing {
@@ -59,7 +60,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -68,8 +69,11 @@ interface JobListing {
 
 export default function JobSearch() {
   const [keyword, setKeyword] = useState("");
-  const [country, setCountry] = useState("Any");
+  const [country, setCountry] = useState("Poland");
+  const [city, setCity] = useState("Warsaw");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [hybridOnly, setHybridOnly] = useState(true);
+  const [thisWeekOnly, setThisWeekOnly] = useState(false);
   const [results, setResults] = useState<JobListing[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -90,7 +94,10 @@ export default function JobSearch() {
     try {
       const params = new URLSearchParams({ keyword: keyword.trim() });
       if (country && country !== "Any") params.set("country", country);
+      if (city.trim()) params.set("city", city.trim());
       if (remoteOnly) params.set("remote", "true");
+      if (hybridOnly) params.set("hybrid", "true");
+      if (thisWeekOnly) params.set("maxDaysOld", "7");
 
       const res = await fetch(`/api/jobs/search?${params}`);
       if (!res.ok) {
@@ -112,7 +119,7 @@ export default function JobSearch() {
         data: {
           companyName: job.company,
           roleTitle: job.title,
-          country: job.country ?? (country !== "Any" ? country : undefined),
+          country: job.country ?? (country !== "Any" ? country : undefined) ?? (city.trim() || undefined),
           jobPostingUrl: job.jobUrl,
           status: "Saved" as ApplicationInputStatus,
           source: job.source,
@@ -182,14 +189,23 @@ export default function JobSearch() {
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
               <Input
-                placeholder="Job title, keyword, or skill (e.g. 'Product Manager')"
+                placeholder="Job title, keyword, or skill (e.g. 'Software Engineer')"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 data-testid="input-keyword"
                 className="w-full"
               />
             </div>
-            <div className="w-full md:w-48">
+            <div className="w-full md:w-36">
+              <Input
+                placeholder="City (e.g. Warsaw)"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                data-testid="input-city"
+                className="w-full"
+              />
+            </div>
+            <div className="w-full md:w-40">
               <Select value={country} onValueChange={setCountry}>
                 <SelectTrigger data-testid="select-country">
                   <SelectValue placeholder="Country" />
@@ -209,22 +225,52 @@ export default function JobSearch() {
               )}
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="remote-toggle"
-              checked={remoteOnly}
-              onChange={(e) => setRemoteOnly(e.target.checked)}
-              className="rounded"
-              data-testid="checkbox-remote"
-            />
-            <label htmlFor="remote-toggle" className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer">
-              <Wifi size={13} />
-              Remote only
-            </label>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="hybrid-toggle"
+                checked={hybridOnly}
+                onChange={(e) => setHybridOnly(e.target.checked)}
+                className="rounded"
+                data-testid="checkbox-hybrid"
+              />
+              <label htmlFor="hybrid-toggle" className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer">
+                <GitMerge size={13} />
+                Hybrid (LinkedIn)
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="remote-toggle"
+                checked={remoteOnly}
+                onChange={(e) => setRemoteOnly(e.target.checked)}
+                className="rounded"
+                data-testid="checkbox-remote"
+              />
+              <label htmlFor="remote-toggle" className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer">
+                <Wifi size={13} />
+                Remote only
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="this-week-toggle"
+                checked={thisWeekOnly}
+                onChange={(e) => setThisWeekOnly(e.target.checked)}
+                className="rounded"
+                data-testid="checkbox-this-week"
+              />
+              <label htmlFor="this-week-toggle" className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer">
+                <CalendarDays size={13} />
+                Posted this week
+              </label>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Searches pull every matching page, not just the first. Adzuna does not cover Turkey — Jooble is the primary source for Turkish listings (İŞKUR government data will be added if an official API becomes available). Remotive and RemoteOK are remote-first sources included when searching remote or without a specific country.
+            Searches Jooble, Adzuna, LinkedIn, Remotive, and RemoteOK — pulling every matching page. City narrows Jooble, Adzuna, and LinkedIn; remote sources are always included when a city is set. "Hybrid" limits LinkedIn to hybrid work type (f_WT=3); combine with Remote only to include both. "Posted this week" filters to the last 7 days — enforced server-side by Adzuna and LinkedIn, post-fetch for others.
           </p>
         </form>
 
@@ -267,7 +313,7 @@ export default function JobSearch() {
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {(["Jooble", "Adzuna", "Remotive", "RemoteOK", "ISKUR"] as const).map((src) => {
+                  {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR"] as const).map((src) => {
                     const count = results.filter((r) => r.source === src).length;
                     if (!count) return null;
                     return (
@@ -391,8 +437,8 @@ export default function JobSearch() {
         {results === null && !isSearching && (
           <div className="text-center py-16 text-muted-foreground" data-testid="search-empty-state">
             <Search size={40} className="mx-auto mb-4 opacity-20" />
-            <p className="font-medium">Search for jobs across Europe and Turkey</p>
-            <p className="text-xs mt-1">Enter a keyword and hit Search to pull results from all configured sources.</p>
+            <p className="font-medium">Search jobs in Warsaw or remote worldwide</p>
+            <p className="text-xs mt-1">Enter a keyword and hit Search — pulls Jooble, Adzuna, LinkedIn, Remotive, and RemoteOK.</p>
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import * as cheerio from "cheerio";
 import { SearchJobsQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -8,9 +9,6 @@ const cache = new Map<string, { data: JobListing[]; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // ─── Pagination / fetch-all controls ────────────────────────────────────────
-// Configurable via env so a broad multi-country search can't run forever or
-// blow through API rate limits. Defaults: up to 10 pages OR 500 results per
-// source, whichever comes first.
 const MAX_PAGES_PER_SOURCE = Number(process.env.JOBS_MAX_PAGES ?? 10);
 const MAX_RESULTS_PER_SOURCE = Number(process.env.JOBS_MAX_RESULTS_PER_SOURCE ?? 500);
 const PAGE_SIZE = 20;
@@ -25,7 +23,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -33,13 +31,11 @@ interface JobListing {
 }
 
 // ─── Jooble (paginated: `page` in POST body, 1-indexed) ──────────────────────
-// Primary source for Turkey. Jooble returns `totalCount`; we loop pages until
-// we've collected everything, hit a cap, or get an empty/short page.
-async function fetchJooble(keyword: string, country: string, remoteOnly: boolean): Promise<JobListing[]> {
+async function fetchJooble(keyword: string, country: string, remoteOnly: boolean, city?: string): Promise<JobListing[]> {
   const apiKey = process.env.JOOBLE_API_KEY;
   if (!apiKey) return [];
 
-  const location = remoteOnly ? "Remote" : country;
+  const location = remoteOnly ? "Remote" : (city ? `${city}, ${country}`.replace(/^, /, "") : country);
   const out: JobListing[] = [];
 
   try {
@@ -50,8 +46,6 @@ async function fetchJooble(keyword: string, country: string, remoteOnly: boolean
         body: JSON.stringify({ keywords: keyword, location, page, resultsOnPage: PAGE_SIZE }),
         signal: AbortSignal.timeout(8000),
       });
-      // Stop this source gracefully on rate-limit / error mid-pagination,
-      // keeping whatever we already collected.
       if (!res.ok) break;
 
       const data = (await res.json()) as {
@@ -82,7 +76,6 @@ async function fetchJooble(keyword: string, country: string, remoteOnly: boolean
         });
       }
 
-      // Stop conditions: hit result cap, reached known total, or short page.
       if (out.length >= MAX_RESULTS_PER_SOURCE) break;
       if (typeof data.totalCount === "number" && out.length >= data.totalCount) break;
       if (jobs.length < PAGE_SIZE) break;
@@ -106,20 +99,21 @@ const ADZUNA_COUNTRY_CODES: Record<string, string> = {
   "new zealand": "nz", "singapore": "sg", "south africa": "za",
 };
 
-// Countries Adzuna has no dataset for. Turkey is the important one here —
-// we skip Adzuna entirely for these and rely on Jooble.
 function adzunaSupports(country: string): boolean {
-  if (!country) return true; // no country → default GB search is fine
+  if (!country) return true;
   return ADZUNA_COUNTRY_CODES[country.toLowerCase()] !== undefined;
 }
 
-async function fetchAdzuna(keyword: string, country: string, remoteOnly: boolean): Promise<JobListing[]> {
+async function fetchAdzuna(
+  keyword: string, country: string, remoteOnly: boolean, maxDaysOld?: number, city?: string
+): Promise<JobListing[]> {
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
   if (!appId || !appKey) return [];
-  if (!adzunaSupports(country)) return []; // e.g. Turkey
+  if (!adzunaSupports(country)) return [];
 
   const code = ADZUNA_COUNTRY_CODES[country.toLowerCase()] ?? "gb";
+  const where = remoteOnly ? "remote" : (city ?? undefined);
   const out: JobListing[] = [];
 
   try {
@@ -129,7 +123,8 @@ async function fetchAdzuna(keyword: string, country: string, remoteOnly: boolean
         app_key: appKey,
         results_per_page: String(PAGE_SIZE),
         what: keyword,
-        ...(remoteOnly ? { where: "remote" } : {}),
+        ...(where ? { where } : {}),
+        ...(maxDaysOld !== undefined ? { max_days_old: String(maxDaysOld) } : {}),
       });
       const res = await fetch(
         `https://api.adzuna.com/v1/api/jobs/${code}/search/${page}?${params}`,
@@ -155,9 +150,7 @@ async function fetchAdzuna(keyword: string, country: string, remoteOnly: boolean
         const salaryMax = j.salary_max ? Math.round(j.salary_max) : null;
         const salary = salaryMin && salaryMax
           ? `${salaryMin.toLocaleString()} – ${salaryMax.toLocaleString()}`
-          : salaryMin
-          ? `${salaryMin.toLocaleString()}+`
-          : null;
+          : salaryMin ? `${salaryMin.toLocaleString()}+` : null;
 
         out.push({
           id: `adzuna-${j.id ?? `${page}-${out.length}`}`,
@@ -188,11 +181,6 @@ async function fetchAdzuna(keyword: string, country: string, remoteOnly: boolean
 }
 
 // ─── İŞKUR (Turkish government employment agency) ────────────────────────────
-// Placeholder. İŞKUR (iskur.gov.tr) does not expose a documented public REST
-// API for job listings at time of writing. We intentionally do NOT scrape it.
-// If/when an official open-data endpoint becomes available, implement the fetch
-// here (it would be the safest possible Turkey source — government data) and
-// add "ISKUR" to the sources wired into the route below.
 async function fetchIskur(_keyword: string, _country: string): Promise<JobListing[]> {
   return [];
 }
@@ -269,6 +257,94 @@ async function fetchRemoteOK(keyword: string): Promise<JobListing[]> {
   }
 }
 
+// ─── LinkedIn (public guest jobs API, no key required) ───────────────────────
+// Searches LinkedIn's publicly-accessible guest job search endpoint using
+// cheerio to parse the HTML job cards it returns.
+//
+// workTypes:
+//   "1" = On-site, "2" = Remote, "3" = Hybrid (comma-separated for multiple)
+// LinkedIn's f_TPR is in seconds: maxDaysOld * 86400.
+async function fetchLinkedIn(
+  keyword: string,
+  location: string,
+  workTypes: string,   // e.g. "2,3" for Remote+Hybrid
+  maxDaysOld?: number,
+): Promise<JobListing[]> {
+  const LI_PAGE_SIZE = 25;
+  const out: JobListing[] = [];
+
+  const timeSeconds = maxDaysOld !== undefined ? maxDaysOld * 86400 : undefined;
+
+  try {
+    for (let start = 0; start < MAX_RESULTS_PER_SOURCE; start += LI_PAGE_SIZE) {
+      if (start / LI_PAGE_SIZE >= MAX_PAGES_PER_SOURCE) break;
+
+      const params = new URLSearchParams({ keywords: keyword, location, start: String(start) });
+      if (workTypes) params.set("f_WT", workTypes);
+      if (timeSeconds) params.set("f_TPR", `r${timeSeconds}`);
+
+      const res = await fetch(
+        `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?${params}`,
+        {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          signal: AbortSignal.timeout(12000),
+        }
+      );
+
+      if (!res.ok) break;
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const cards = $("li");
+      if (cards.length === 0) break;
+
+      cards.each((_, el) => {
+        const $el = $(el);
+        const title = $el.find(".base-search-card__title").text().trim();
+        const company = $el.find(".base-search-card__subtitle").text().trim();
+        const loc = $el.find(".job-search-card__location").text().trim();
+        const dateAttr = $el.find("time[datetime]").attr("datetime") ?? null;
+        const rawUrl =
+          $el.find("a.base-card__full-link").attr("href") ??
+          $el.find("a[href*='/jobs/view/']").attr("href") ?? "";
+
+        if (!title || !rawUrl) return;
+
+        // Strip tracking params from LinkedIn URLs
+        const jobUrl = rawUrl.split("?")[0] ?? rawUrl;
+        const jobIdMatch = jobUrl.match(/\/jobs\/view\/(\d+)/);
+        const id = `linkedin-${jobIdMatch?.[1] ?? `${start}-${out.length}`}`;
+        const isRemote = /remote/i.test(loc);
+
+        out.push({
+          id,
+          title,
+          company,
+          location: loc || location,
+          country: null,
+          salary: null,
+          source: "LinkedIn",
+          postedAt: dateAttr,
+          jobUrl,
+          snippet: null,
+          isRemote,
+        });
+      });
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (cards.length < LI_PAGE_SIZE) break;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/rate-limit/block — return what we collected
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
 // ─── De-duplicate by company+title+location ───────────────────────────────────
 function deduplicate(listings: JobListing[]): JobListing[] {
   const seen = new Set<string>();
@@ -280,6 +356,16 @@ function deduplicate(listings: JobListing[]): JobListing[] {
   });
 }
 
+// ─── Date filter ─────────────────────────────────────────────────────────────
+function filterByAge(listings: JobListing[], maxDaysOld: number): JobListing[] {
+  const cutoff = Date.now() - maxDaysOld * 24 * 60 * 60 * 1000;
+  return listings.filter((j) => {
+    if (!j.postedAt) return false;
+    const posted = new Date(j.postedAt).getTime();
+    return !isNaN(posted) && posted >= cutoff;
+  });
+}
+
 // ─── Route ───────────────────────────────────────────────────────────────────
 router.get("/jobs/search", async (req, res): Promise<void> => {
   const parsed = SearchJobsQueryParams.safeParse(req.query);
@@ -288,28 +374,39 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     return;
   }
 
-  const { keyword, country = "", remote } = parsed.data;
+  const { keyword, country = "", remote, hybrid, city, maxDaysOld } = parsed.data;
   const remoteOnly = remote === "true";
+  const hybridOnly = hybrid === "true";
 
-  // Cache key includes the per-source cap so cached results stay consistent
-  // if the cap is ever changed via env.
-  const cacheKey = `${keyword}|${country}|${remoteOnly}|${MAX_PAGES_PER_SOURCE}|${MAX_RESULTS_PER_SOURCE}`;
+  // Build LinkedIn work-type filter string from remote/hybrid flags.
+  // Empty string = all work types (LinkedIn default).
+  const liWorkTypes = [
+    ...(remoteOnly ? ["2"] : []),
+    ...(hybridOnly ? ["3"] : []),
+  ].join(",");
+
+  // LinkedIn location: prefer "City, Country" when both are provided.
+  const liLocation = city && country ? `${city}, ${country}` : city ?? country;
+
+  const cacheKey = `${keyword}|${country}|${city ?? ""}|${remoteOnly}|${hybridOnly}|${maxDaysOld ?? ""}|${MAX_PAGES_PER_SOURCE}|${MAX_RESULTS_PER_SOURCE}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     res.json(cached.data);
     return;
   }
 
-  const shouldFetchRemote = remoteOnly || !country;
+  // Include remote sources (Remotive, RemoteOK) when: explicitly remote-only,
+  // no country specified, OR a city is given (city searches always mix in remote).
+  const shouldFetchRemote = remoteOnly || !country || !!city;
   const isTurkey = country.toLowerCase() === "turkey";
 
-  // Each source paginates internally; we run the sources in parallel.
-  const [jooble, adzuna, iskur, remotive, remoteOK] = await Promise.allSettled([
-    fetchJooble(keyword, country, remoteOnly),
-    fetchAdzuna(keyword, country, remoteOnly),
+  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin] = await Promise.allSettled([
+    fetchJooble(keyword, country, remoteOnly, city),
+    fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city),
     isTurkey ? fetchIskur(keyword, country) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemotive(keyword) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemoteOK(keyword) : Promise.resolve([]),
+    liLocation ? fetchLinkedIn(keyword, liLocation, liWorkTypes, maxDaysOld) : Promise.resolve([]),
   ]);
 
   const all: JobListing[] = [
@@ -318,9 +415,12 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     ...(iskur.status === "fulfilled" ? iskur.value : []),
     ...(remotive.status === "fulfilled" ? remotive.value : []),
     ...(remoteOK.status === "fulfilled" ? remoteOK.value : []),
+    ...(linkedin.status === "fulfilled" ? linkedin.value : []),
   ];
 
-  const results = deduplicate(all);
+  const deduped = deduplicate(all);
+  const results = maxDaysOld !== undefined ? filterByAge(deduped, maxDaysOld) : deduped;
+
   cache.set(cacheKey, { data: results, expiresAt: Date.now() + CACHE_TTL_MS });
 
   res.json(results);

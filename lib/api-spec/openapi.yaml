@@ -339,12 +339,33 @@ paths:
           required: false
           schema:
             type: string
+        - name: city
+          in: query
+          required: false
+          description: City to search within (e.g. "Warsaw"). Passed to Jooble, Adzuna, and LinkedIn. Remote sources (Remotive, RemoteOK) are always included when a city is set.
+          schema:
+            type: string
         - name: remote
           in: query
           required: false
           schema:
             type: string
             enum: ["true", "false"]
+        - name: hybrid
+          in: query
+          required: false
+          description: When "true", limits LinkedIn results to hybrid work type (f_WT=3). Can be combined with remote=true to get both Remote+Hybrid.
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - name: maxDaysOld
+          in: query
+          required: false
+          description: Only return listings posted within this many days (1–90). Passed natively to Adzuna and LinkedIn; other sources are filtered after fetch.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 90
       responses:
         "200":
           description: Job listings merged from all configured sources
@@ -611,7 +632,7 @@ components:
           type: ["string", "null"]
         source:
           type: string
-          enum: [Jooble, Adzuna, Remotive, RemoteOK, ISKUR]
+          enum: [Jooble, Adzuna, Remotive, RemoteOK, ISKUR, LinkedIn]
         postedAt:
           type: ["string", "null"]
         jobUrl:

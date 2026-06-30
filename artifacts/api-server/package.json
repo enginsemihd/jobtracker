@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.38.4",
     "express": "^5.0.1",

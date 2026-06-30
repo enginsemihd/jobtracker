@@ -82,5 +82,8 @@ export const TailorMaterialsBody = z.object({ applicationId: z.number().int() })
 export const SearchJobsQueryParams = z.object({
   keyword: z.string().min(1),
   country: z.string().optional(),
+  city: z.string().optional(),
   remote: z.enum(["true", "false"]).optional(),
+  hybrid: z.enum(["true", "false"]).optional(),
+  maxDaysOld: z.coerce.number().int().min(1).max(90).optional(),
 });
