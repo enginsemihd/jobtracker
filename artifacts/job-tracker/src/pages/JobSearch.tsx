@@ -141,6 +141,9 @@ const SOURCE_COLORS: Record<string, string> = {
   Arbeitnow: "bg-amber-100 text-amber-700 border-amber-200",
   Jobicy:    "bg-teal-100 text-teal-700 border-teal-200",
   Reed:      "bg-red-100 text-red-700 border-red-200",
+  Himalayas: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  Findwork:  "bg-lime-100 text-lime-700 border-lime-200",
+  USAJOBS:   "bg-cyan-100 text-cyan-700 border-cyan-200",
 };
 
 interface JobListing {
@@ -150,7 +153,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork" | "USAJOBS";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -406,7 +409,7 @@ export default function JobSearch() {
           <div className="space-y-3" data-testid="search-loading">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Loader2 size={12} className="animate-spin" />
-              Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy…
+              Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork…
             </p>
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="bg-card border border-border rounded-lg p-4 animate-pulse">
@@ -432,7 +435,7 @@ export default function JobSearch() {
                 {results.length} result{results.length !== 1 ? "s" : ""} found
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR", "Arbeitnow", "Jobicy", "Reed"] as const).map((src) => {
+                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR", "Arbeitnow", "Jobicy", "Reed", "Himalayas", "Findwork", "USAJOBS"] as const).map((src) => {
                   const count = results.filter((r) => r.source === src).length;
                   if (!count) return null;
                   return (
@@ -555,7 +558,7 @@ export default function JobSearch() {
           <div className="text-center py-16 text-muted-foreground" data-testid="search-empty-state">
             <Search size={40} className="mx-auto mb-4 opacity-20" />
             <p className="font-medium">Set your criteria and search</p>
-            <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, and Jobicy in parallel.</p>
+            <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, and Findwork in parallel.</p>
             <p className="text-xs mt-0.5 text-muted-foreground/70">Quick Apply opens the posting and logs it as Applied in one click.</p>
           </div>
         )}

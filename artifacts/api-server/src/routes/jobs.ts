@@ -23,7 +23,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork" | "USAJOBS";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -433,6 +433,210 @@ async function fetchReed(keyword: string, remoteOnly: boolean, city?: string): P
   return out.slice(0, MAX_RESULTS_PER_SOURCE);
 }
 
+// ─── Himalayas (official public API, no key required; remote-only jobs).
+// The API has no server-side keyword search, so we fetch a page window and
+// filter client-side by keyword against title/company/categories. ───────────
+async function fetchHimalayas(keyword: string): Promise<JobListing[]> {
+  const out: JobListing[] = [];
+  const terms = keyword.toLowerCase().split(/\s+/).filter(Boolean);
+  const HI_PAGE_SIZE = 100;
+
+  try {
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page++) {
+      const offset = page * HI_PAGE_SIZE;
+      const res = await fetch(`https://himalayas.app/jobs/api?limit=${HI_PAGE_SIZE}&offset=${offset}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        totalCount?: number;
+        jobs?: Array<{
+          guid?: string; title?: string; companyName?: string; excerpt?: string;
+          categories?: string[]; locationRestrictions?: string[]; pubDate?: number;
+          applicationLink?: string; minSalary?: number; maxSalary?: number; currency?: string;
+        }>;
+      };
+
+      const jobs = data.jobs ?? [];
+      if (jobs.length === 0) break;
+
+      for (const j of jobs) {
+        if (!j.applicationLink || !j.title) continue;
+        const haystack = `${j.title} ${j.companyName ?? ""} ${(j.categories ?? []).join(" ")}`.toLowerCase();
+        if (terms.length && !terms.every((t) => haystack.includes(t))) continue;
+
+        const salary = j.minSalary && j.maxSalary
+          ? `${j.currency ?? "USD"} ${j.minSalary.toLocaleString()} – ${j.maxSalary.toLocaleString()}`
+          : null;
+
+        out.push({
+          id: `himalayas-${j.guid ?? `${page}-${out.length}`}`,
+          title: j.title,
+          company: j.companyName ?? "",
+          location: (j.locationRestrictions ?? []).join(", ") || "Remote",
+          country: null,
+          salary,
+          source: "Himalayas",
+          postedAt: j.pubDate ? new Date(j.pubDate * 1000).toISOString() : null,
+          jobUrl: j.applicationLink,
+          snippet: j.excerpt || null,
+          isRemote: true,
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (jobs.length < HI_PAGE_SIZE) break;
+      if (typeof data.totalCount === "number" && offset + HI_PAGE_SIZE >= data.totalCount) break;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/abort — return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
+// ─── Findwork.dev (official API; requires free API token from findwork.dev) ──
+async function fetchFindwork(keyword: string, remoteOnly: boolean, city?: string): Promise<JobListing[]> {
+  const apiKey = process.env.FINDWORK_API_KEY;
+  if (!apiKey) return [];
+
+  const out: JobListing[] = [];
+  const params = new URLSearchParams({ search: keyword });
+  if (city) params.set("location", city);
+  if (remoteOnly) params.set("remote", "true");
+  let url: string | null = `https://findwork.dev/api/jobs/?${params}`;
+
+  try {
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE && url; page++) {
+      const res = await fetch(url, {
+        headers: { Authorization: `Token ${apiKey}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        next?: string | null;
+        results?: Array<{
+          id?: number; role?: string; text?: string; company_name?: string;
+          location?: string; remote?: boolean; url?: string; date_posted?: string;
+        }>;
+      };
+
+      const jobs = data.results ?? [];
+      if (jobs.length === 0) break;
+
+      for (const j of jobs) {
+        if (!j.url || !j.role) continue;
+        out.push({
+          id: `findwork-${j.id ?? `${page}-${out.length}`}`,
+          title: j.role,
+          company: j.company_name ?? "",
+          location: j.location || (j.remote ? "Remote" : ""),
+          country: null,
+          salary: null,
+          source: "Findwork",
+          postedAt: j.date_posted || null,
+          jobUrl: j.url,
+          snippet: j.text?.replace(/<[^>]+>/g, "").slice(0, 300) || null,
+          isRemote: !!j.remote,
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      url = data.next ?? null;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/abort/invalid-token — return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
+// ─── USAJOBS (official US federal jobs API; requires free registration) ──────
+async function fetchUSAJobs(keyword: string, city?: string): Promise<JobListing[]> {
+  const apiKey = process.env.USAJOBS_API_KEY;
+  const email = process.env.USAJOBS_EMAIL;
+  if (!apiKey || !email) return [];
+
+  const out: JobListing[] = [];
+  const RESULTS_PER_PAGE = 100;
+
+  try {
+    for (let page = 1; page <= MAX_PAGES_PER_SOURCE; page++) {
+      const params = new URLSearchParams({
+        Keyword: keyword,
+        ResultsPerPage: String(RESULTS_PER_PAGE),
+        Page: String(page),
+      });
+      if (city) params.set("LocationName", city);
+
+      const res = await fetch(`https://data.usajobs.gov/api/search?${params}`, {
+        headers: {
+          Host: "data.usajobs.gov",
+          "User-Agent": email,
+          "Authorization-Key": apiKey,
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        SearchResult?: {
+          SearchResultCountAll?: number;
+          SearchResultItems?: Array<{
+            MatchedObjectDescriptor?: {
+              PositionTitle?: string; OrganizationName?: string; PositionLocationDisplay?: string;
+              PositionURI?: string; PublicationStartDate?: string;
+              PositionRemuneration?: Array<{ MinimumRange?: string; MaximumRange?: string; RateIntervalCode?: string }>;
+            };
+          }>;
+        };
+      };
+
+      const items = data.SearchResult?.SearchResultItems ?? [];
+      if (items.length === 0) break;
+
+      for (const item of items) {
+        const j = item.MatchedObjectDescriptor;
+        if (!j?.PositionURI || !j.PositionTitle) continue;
+        const pay = j.PositionRemuneration?.[0];
+        const salary = pay?.MinimumRange && pay.MaximumRange
+          ? `$${Number(pay.MinimumRange).toLocaleString()} – $${Number(pay.MaximumRange).toLocaleString()} ${pay.RateIntervalCode ?? ""}`.trim()
+          : null;
+
+        out.push({
+          id: `usajobs-${out.length}-${j.PositionURI}`,
+          title: j.PositionTitle,
+          company: j.OrganizationName ?? "",
+          location: j.PositionLocationDisplay || "United States",
+          country: "United States",
+          salary,
+          source: "USAJOBS",
+          postedAt: j.PublicationStartDate || null,
+          jobUrl: j.PositionURI,
+          snippet: null,
+          isRemote: false,
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (typeof data.SearchResult?.SearchResultCountAll === "number" && out.length >= data.SearchResult.SearchResultCountAll) break;
+      if (items.length < RESULTS_PER_PAGE) break;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
 // ─── LinkedIn (public guest jobs API, no key required) ───────────────────────
 // Searches LinkedIn's publicly-accessible guest job search endpoint using
 // cheerio to parse the HTML job cards it returns.
@@ -588,8 +792,9 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   const isTurkey = country.toLowerCase() === "turkey";
   const isUK = ["united kingdom", "uk", "gb", "great britain"].includes(country.toLowerCase());
   const shouldFetchReed = isUK || !country;
+  const isUSA = ["united states", "usa", "us"].includes(country.toLowerCase());
 
-  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin, arbeitnow, jobicy, reed] = await Promise.allSettled([
+  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin, arbeitnow, jobicy, reed, himalayas, findwork, usajobs] = await Promise.allSettled([
     fetchJooble(keyword, country, remoteOnly, city),
     fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city, jobType),
     isTurkey ? fetchIskur(keyword, country) : Promise.resolve([]),
@@ -599,6 +804,9 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     fetchArbeitnow(keyword, remoteOnly),
     shouldFetchRemote ? fetchJobicy(keyword) : Promise.resolve([]),
     shouldFetchReed ? fetchReed(keyword, remoteOnly, city) : Promise.resolve([]),
+    shouldFetchRemote ? fetchHimalayas(keyword) : Promise.resolve([]),
+    fetchFindwork(keyword, remoteOnly, city),
+    isUSA ? fetchUSAJobs(keyword, city) : Promise.resolve([]),
   ]);
 
   const all: JobListing[] = [
@@ -611,6 +819,9 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     ...(arbeitnow.status === "fulfilled" ? arbeitnow.value : []),
     ...(jobicy.status === "fulfilled" ? jobicy.value : []),
     ...(reed.status === "fulfilled" ? reed.value : []),
+    ...(himalayas.status === "fulfilled" ? himalayas.value : []),
+    ...(findwork.status === "fulfilled" ? findwork.value : []),
+    ...(usajobs.status === "fulfilled" ? usajobs.value : []),
   ];
 
   const deduped = deduplicate(all);
