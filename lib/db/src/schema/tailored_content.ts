@@ -1,7 +1,7 @@
 import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { applicationsTable } from "./applications";
+import { applicationsTable } from "./applications.js";
 
 export const tailoredContentTable = pgTable("tailored_content", {
   id: serial("id").primaryKey(),

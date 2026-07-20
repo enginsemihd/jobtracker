@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db, applicationsTable, profileTable, tailoredContentTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { TailorMaterialsBody } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
 
 // ============================================================
 // SYSTEM PROMPT — edit this constant to tune Claude's tone and

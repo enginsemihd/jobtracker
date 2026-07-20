@@ -7,8 +7,8 @@ import {
   verifyPassword,
   signToken,
   verifyGoogleCredential,
-} from "../lib/auth";
-import { requireAuth } from "../middlewares/auth";
+} from "../lib/auth.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

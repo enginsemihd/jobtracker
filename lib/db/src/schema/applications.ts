@@ -1,7 +1,7 @@
 import { pgTable, text, serial, timestamp, date, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { usersTable } from "./users";
+import { usersTable } from "./users.js";
 
 export const APPLICATION_STATUSES = [
   "Saved",
