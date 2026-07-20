@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateApplication, getListApplicationsQueryKey, getGetDashboardStatsQueryKey } from "@workspace/api-client-react";
+import { useCreateApplication, getListApplicationsQueryKey, getGetDashboardStatsQueryKey, getApiBaseUrl, getToken } from "@workspace/api-client-react";
 import {
   Search, Loader2, MapPin, Building2, ExternalLink, BookmarkPlus,
   Check, Wifi, AlertCircle, CalendarDays, GitMerge, Send, Briefcase, Globe,
@@ -202,7 +202,10 @@ export default function JobSearch() {
       if (effectiveJobType) params.set("jobType", effectiveJobType);
       if (thisWeekOnly) params.set("maxDaysOld", "7");
 
-      const res = await fetch(`/api/jobs/search?${params}`);
+      const token = getToken();
+      const res = await fetch(`${getApiBaseUrl()}/api/jobs/search?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Search failed" }));
         throw new Error(err.error ?? "Search failed");

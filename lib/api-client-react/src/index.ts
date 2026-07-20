@@ -131,6 +131,9 @@ let API_BASE_URL = "";
 export function setApiBaseUrl(url: string): void {
   API_BASE_URL = url.replace(/\/$/, "");
 }
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
