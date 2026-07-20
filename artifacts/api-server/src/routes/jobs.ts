@@ -437,34 +437,40 @@ async function fetchReed(keyword: string, remoteOnly: boolean, city?: string): P
 // The API has no server-side keyword search, so we fetch a page window and
 // filter client-side by keyword against title/company/categories. ───────────
 async function fetchHimalayas(keyword: string): Promise<JobListing[]> {
-  const out: JobListing[] = [];
   const terms = keyword.toLowerCase().split(/\s+/).filter(Boolean);
-  const HI_PAGE_SIZE = 100;
+  // The API silently caps `limit` at 20 regardless of what's requested. Since
+  // there's no server-side keyword filter and the match rate against a small
+  // sample is low, we scan several pages fetched concurrently (not sequential
+  // + delayed like the other sources) to keep overall search latency down.
+  const HI_PAGE_SIZE = 20;
+  const HI_PAGES = MAX_PAGES_PER_SOURCE * 3;
+
+  type HimalayasPage = {
+    jobs?: Array<{
+      guid?: string; title?: string; companyName?: string; excerpt?: string;
+      categories?: string[]; locationRestrictions?: string[]; pubDate?: number;
+      applicationLink?: string; minSalary?: number; maxSalary?: number; currency?: string;
+    }>;
+  };
+
+  const out: JobListing[] = [];
 
   try {
-    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page++) {
-      const offset = page * HI_PAGE_SIZE;
-      const res = await fetch(`https://himalayas.app/jobs/api?limit=${HI_PAGE_SIZE}&offset=${offset}`, {
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!res.ok) break;
+    const pages = await Promise.all(
+      Array.from({ length: HI_PAGES }, (_, page) =>
+        fetch(`https://himalayas.app/jobs/api?limit=${HI_PAGE_SIZE}&offset=${page * HI_PAGE_SIZE}`, {
+          signal: AbortSignal.timeout(10000),
+        })
+          .then((res) => (res.ok ? (res.json() as Promise<HimalayasPage>) : null))
+          .catch(() => null)
+      )
+    );
 
-      const data = (await res.json()) as {
-        totalCount?: number;
-        jobs?: Array<{
-          guid?: string; title?: string; companyName?: string; excerpt?: string;
-          categories?: string[]; locationRestrictions?: string[]; pubDate?: number;
-          applicationLink?: string; minSalary?: number; maxSalary?: number; currency?: string;
-        }>;
-      };
-
-      const jobs = data.jobs ?? [];
-      if (jobs.length === 0) break;
-
-      for (const j of jobs) {
+    for (const [page, data] of pages.entries()) {
+      for (const j of data?.jobs ?? []) {
         if (!j.applicationLink || !j.title) continue;
         const haystack = `${j.title} ${j.companyName ?? ""} ${(j.categories ?? []).join(" ")}`.toLowerCase();
-        if (terms.length && !terms.every((t) => haystack.includes(t))) continue;
+        if (terms.length && !terms.some((t) => haystack.includes(t))) continue;
 
         const salary = j.minSalary && j.maxSalary
           ? `${j.currency ?? "USD"} ${j.minSalary.toLocaleString()} – ${j.maxSalary.toLocaleString()}`
@@ -484,15 +490,9 @@ async function fetchHimalayas(keyword: string): Promise<JobListing[]> {
           isRemote: true,
         });
       }
-
-      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
-      if (jobs.length < HI_PAGE_SIZE) break;
-      if (typeof data.totalCount === "number" && offset + HI_PAGE_SIZE >= data.totalCount) break;
-
-      await sleep(PAGE_DELAY_MS);
     }
   } catch {
-    // network/abort — return what we have
+    // return what we have
   }
 
   return out.slice(0, MAX_RESULTS_PER_SOURCE);
