@@ -1,6 +1,6 @@
 # JobTrack — Claude Code için proje notları
 
-Bu, kişisel bir iş başvurusu takip uygulamasıdır. AI ile özgeçmiş/ön yazı uyarlama (Claude) ve çok kaynaklı iş arama (Jooble, Adzuna, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork, USAJOBS) içerir. Avrupa + Türkiye + UK pazarına odaklıdır (USAJOBS yalnızca country="United States" için tetiklenir). Çoklu kullanıcı destekli (JWT auth, her kullanıcı kendi profili/başvuruları).
+Bu, kişisel bir iş başvurusu takip uygulamasıdır. AI ile özgeçmiş/ön yazı uyarlama (Claude) ve çok kaynaklı iş arama (Jooble, Adzuna, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork) içerir. Avrupa + Türkiye + UK pazarına odaklıdır. Çoklu kullanıcı destekli (JWT auth, her kullanıcı kendi profili/başvuruları).
 
 ## Mimari (pnpm monorepo)
 - `artifacts/job-tracker` — React + Vite + Tailwind v4 (ön yüz, port 5173)
@@ -27,4 +27,4 @@ Bu, kişisel bir iş başvurusu takip uygulamasıdır. AI ile özgeçmiş/ön ya
 - Büyük değişikliklerden önce `git add -A && git commit` ile kayıt al ki geri alınabilsin.
 
 ## Ortam değişkenleri (.env)
-DATABASE_URL, PORT (8080), JWT_SECRET, ANTHROPIC_API_KEY, JOOBLE_API_KEY, (opsiyonel) ADZUNA_APP_ID/ADZUNA_APP_KEY, (opsiyonel) REED_API_KEY, (opsiyonel) FINDWORK_API_KEY, (opsiyonel) USAJOBS_API_KEY + USAJOBS_EMAIL, (opsiyonel) GOOGLE_CLIENT_ID + VITE_GOOGLE_CLIENT_ID (Google ile giriş). Himalayas anahtarsız/keyless.
+DATABASE_URL, PORT (8080), JWT_SECRET, ANTHROPIC_API_KEY, JOOBLE_API_KEY, (opsiyonel) ADZUNA_APP_ID/ADZUNA_APP_KEY, (opsiyonel) REED_API_KEY, (opsiyonel) FINDWORK_API_KEY, (opsiyonel) GOOGLE_CLIENT_ID + VITE_GOOGLE_CLIENT_ID (Google ile giriş). Himalayas anahtarsız/keyless.

@@ -143,7 +143,6 @@ const SOURCE_COLORS: Record<string, string> = {
   Reed:      "bg-red-100 text-red-700 border-red-200",
   Himalayas: "bg-indigo-100 text-indigo-700 border-indigo-200",
   Findwork:  "bg-lime-100 text-lime-700 border-lime-200",
-  USAJOBS:   "bg-cyan-100 text-cyan-700 border-cyan-200",
 };
 
 interface JobListing {
@@ -153,7 +152,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork" | "USAJOBS";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -435,7 +434,7 @@ export default function JobSearch() {
                 {results.length} result{results.length !== 1 ? "s" : ""} found
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR", "Arbeitnow", "Jobicy", "Reed", "Himalayas", "Findwork", "USAJOBS"] as const).map((src) => {
+                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR", "Arbeitnow", "Jobicy", "Reed", "Himalayas", "Findwork"] as const).map((src) => {
                   const count = results.filter((r) => r.source === src).length;
                   if (!count) return null;
                   return (
