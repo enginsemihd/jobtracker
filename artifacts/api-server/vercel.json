@@ -1,3 +1,4 @@
 {
+  "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }

@@ -3,8 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "push": "drizzle-kit push",
     "generate": "drizzle-kit generate",
     "studio": "drizzle-kit studio",
