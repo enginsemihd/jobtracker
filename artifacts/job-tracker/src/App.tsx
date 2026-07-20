@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/not-found";
 
 import Layout from "@/components/Layout";
@@ -10,6 +11,8 @@ import ApplicationNew from "@/pages/ApplicationNew";
 import ApplicationDetail from "@/pages/ApplicationDetail";
 import Profile from "@/pages/Profile";
 import JobSearch from "@/pages/JobSearch";
+import Login from "@/pages/Login";
+import { AuthProvider, useAuth } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
@@ -36,13 +39,31 @@ function Router() {
   );
 }
 
+function AuthGate() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
+
+  return <Router />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthGate />
+          </WouterRouter>
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

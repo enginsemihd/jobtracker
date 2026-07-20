@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Plus, User, Menu, X, Briefcase, Search } from "lucide-react";
+import { LayoutDashboard, Plus, User, Menu, X, Briefcase, Search, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -13,6 +14,7 @@ const navItems = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <div className="flex h-screen bg-background" data-testid="layout">
@@ -42,6 +44,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+        <div className="border-t border-sidebar-border p-3 space-y-2">
+          {user && (
+            <div className="flex items-center gap-2 px-1 text-sm text-sidebar-foreground truncate">
+              <User size={15} className="shrink-0" />
+              <span className="truncate" data-testid="text-username">{user.username}</span>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            data-testid="button-logout"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            <LogOut size={16} />
+            Log out
+          </button>
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -85,6 +103,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                logout();
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            >
+              <LogOut size={16} />
+              Log out
+            </button>
           </div>
         </div>
       )}

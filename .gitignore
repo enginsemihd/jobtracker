@@ -5,3 +5,4 @@ dist
 *.log
 lib/db/drizzle
 .vite
+.neon

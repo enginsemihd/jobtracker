@@ -15,6 +15,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,
+    // Dev-only: allow requests through a temporary tunnel (e.g. trycloudflare.com)
+    // for sharing the app during local development.
+    allowedHosts: true,
     proxy: {
       "/api": "http://localhost:8080",
     },

@@ -109,11 +109,42 @@ export class ApiError extends Error {
   }
 }
 
+// ─── Auth token store (localStorage) ─────────────────────────────────────────
+const TOKEN_KEY = "jobtrack_token";
+
+export function getToken(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function setToken(token: string): void {
+  if (typeof localStorage !== "undefined") localStorage.setItem(TOKEN_KEY, token);
+}
+export function clearToken(): void {
+  if (typeof localStorage !== "undefined") localStorage.removeItem(TOKEN_KEY);
+}
+
+// Base URL prepended to every API request. Empty string (default) means
+// same-origin relative "/api/..." — correct for local dev (Vite proxies it)
+// and for a single-domain deployment. Call setApiBaseUrl() once at app
+// startup when the API is deployed on a different origin than the frontend.
+let API_BASE_URL = "";
+export function setApiBaseUrl(url: string): void {
+  API_BASE_URL = url.replace(/\/$/, "");
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { "Content-Type": "application/json" },
+  const token = getToken();
+  const res = await fetch(`${API_BASE_URL}/api${path}`, {
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
   });
+  if (res.status === 401) {
+    clearToken();
+  }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   const json = text ? JSON.parse(text) : undefined;
@@ -287,5 +318,67 @@ export function useUpsertProfile() {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+  });
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+export interface AuthUser {
+  id: number;
+  username: string;
+}
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+export interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
+export const getMeQueryKey = () => ["/auth/me"] as const;
+
+export function useRegister() {
+  return useMutation<AuthResponse, ApiError, { data: AuthCredentials }>({
+    mutationFn: ({ data }) =>
+      http<AuthResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useLogin() {
+  return useMutation<AuthResponse, ApiError, { data: AuthCredentials }>({
+    mutationFn: ({ data }) =>
+      http<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useGoogleAuth() {
+  return useMutation<AuthResponse, ApiError, { data: { credential: string } }>({
+    mutationFn: ({ data }) =>
+      http<AuthResponse>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useMe(options?: QueryOpts<AuthUser | null>) {
+  return useQuery<AuthUser | null, ApiError, AuthUser | null, readonly unknown[]>({
+    queryKey: getMeQueryKey(),
+    queryFn: async () => {
+      if (!getToken()) return null;
+      try {
+        return await http<AuthUser>("/auth/me");
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) return null;
+        throw e;
+      }
+    },
+    ...(options?.query as object),
   });
 }

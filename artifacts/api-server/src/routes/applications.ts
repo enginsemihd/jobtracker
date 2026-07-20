@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, lte, and, gte, sql, isNotNull } from "drizzle-orm";
+import { eq, desc, lte, and, isNotNull } from "drizzle-orm";
 import { db, applicationsTable, tailoredContentTable } from "@workspace/db";
 import {
   ListApplicationsQueryParams,
@@ -13,24 +13,27 @@ import {
   SaveTailoredContentParams,
   SaveTailoredContentBody,
 } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
 router.get("/applications", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const parsed = ListApplicationsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  let query = db.select().from(applicationsTable).$dynamic();
-
+  const conds = [eq(applicationsTable.userId, userId)];
   if (parsed.data.status) {
-    query = query.where(eq(applicationsTable.status, parsed.data.status));
+    conds.push(eq(applicationsTable.status, parsed.data.status));
   }
 
-  const results = await query.orderBy(desc(applicationsTable.dateAdded));
+  const results = await db
+    .select()
+    .from(applicationsTable)
+    .where(and(...conds))
+    .orderBy(desc(applicationsTable.dateAdded));
 
   if (parsed.data.search) {
     const search = parsed.data.search.toLowerCase();
@@ -47,6 +50,7 @@ router.get("/applications", async (req, res): Promise<void> => {
 });
 
 router.post("/applications", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const parsed = CreateApplicationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -57,6 +61,7 @@ router.post("/applications", async (req, res): Promise<void> => {
     .insert(applicationsTable)
     .values({
       ...parsed.data,
+      userId,
       status: parsed.data.status ?? "Saved",
     })
     .returning();
@@ -65,6 +70,7 @@ router.post("/applications", async (req, res): Promise<void> => {
 });
 
 router.get("/applications/:id", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetApplicationParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -75,7 +81,12 @@ router.get("/applications/:id", async (req, res): Promise<void> => {
   const [application] = await db
     .select()
     .from(applicationsTable)
-    .where(eq(applicationsTable.id, params.data.id));
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    );
 
   if (!application) {
     res.status(404).json({ error: "Application not found" });
@@ -86,6 +97,7 @@ router.get("/applications/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/applications/:id", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetApplicationParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -102,7 +114,12 @@ router.patch("/applications/:id", async (req, res): Promise<void> => {
   const [application] = await db
     .update(applicationsTable)
     .set(parsed.data)
-    .where(eq(applicationsTable.id, params.data.id))
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    )
     .returning();
 
   if (!application) {
@@ -114,6 +131,7 @@ router.patch("/applications/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/applications/:id", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteApplicationParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -123,7 +141,12 @@ router.delete("/applications/:id", async (req, res): Promise<void> => {
 
   const [application] = await db
     .delete(applicationsTable)
-    .where(eq(applicationsTable.id, params.data.id))
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    )
     .returning();
 
   if (!application) {
@@ -135,6 +158,7 @@ router.delete("/applications/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/applications/:id/status", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateApplicationStatusParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -151,7 +175,12 @@ router.patch("/applications/:id/status", async (req, res): Promise<void> => {
   const [application] = await db
     .update(applicationsTable)
     .set({ status: parsed.data.status })
-    .where(eq(applicationsTable.id, params.data.id))
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    )
     .returning();
 
   if (!application) {
@@ -163,10 +192,25 @@ router.patch("/applications/:id/status", async (req, res): Promise<void> => {
 });
 
 router.get("/applications/:id/tailored-content", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetTailoredContentParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [app] = await db
+    .select()
+    .from(applicationsTable)
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    );
+  if (!app) {
+    res.status(404).json({ error: "Application not found" });
     return;
   }
 
@@ -184,6 +228,7 @@ router.get("/applications/:id/tailored-content", async (req, res): Promise<void>
 });
 
 router.patch("/applications/:id/tailored-content", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = SaveTailoredContentParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -200,7 +245,12 @@ router.patch("/applications/:id/tailored-content", async (req, res): Promise<voi
   const [app] = await db
     .select()
     .from(applicationsTable)
-    .where(eq(applicationsTable.id, params.data.id));
+    .where(
+      and(
+        eq(applicationsTable.id, params.data.id),
+        eq(applicationsTable.userId, userId)
+      )
+    );
 
   if (!app) {
     res.status(404).json({ error: "Application not found" });
@@ -229,12 +279,16 @@ router.patch("/applications/:id/tailored-content", async (req, res): Promise<voi
   res.json(content);
 });
 
-router.get("/dashboard/stats", async (_req, res): Promise<void> => {
+router.get("/dashboard/stats", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const todayStr = now.toISOString().split("T")[0];
 
-  const allApps = await db.select().from(applicationsTable);
+  const allApps = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.userId, userId));
 
   const total = allApps.length;
   const appliedThisWeek = allApps.filter(
@@ -277,7 +331,8 @@ router.get("/dashboard/stats", async (_req, res): Promise<void> => {
   });
 });
 
-router.get("/dashboard/follow-ups", async (_req, res): Promise<void> => {
+router.get("/dashboard/follow-ups", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const todayStr = new Date().toISOString().split("T")[0];
 
   const overdue = await db
@@ -285,6 +340,7 @@ router.get("/dashboard/follow-ups", async (_req, res): Promise<void> => {
     .from(applicationsTable)
     .where(
       and(
+        eq(applicationsTable.userId, userId),
         isNotNull(applicationsTable.followUpDate),
         lte(applicationsTable.followUpDate, todayStr)
       )

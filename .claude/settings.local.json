@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(pnpm --filter @workspace/api-server add cheerio)",
-      "PowerShell(npm install *)"
+      "PowerShell(npm install *)",
+      "WebFetch(domain:www.youthall.com)",
+      "WebSearch"
     ]
   }
 }

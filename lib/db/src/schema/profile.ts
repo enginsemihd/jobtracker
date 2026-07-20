@@ -1,9 +1,14 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const profileTable = pgTable("profile", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .unique()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   resumeText: text("resume_text"),
   keySkills: text("key_skills"),
   careerSummary: text("career_summary"),
@@ -16,6 +21,7 @@ export const profileTable = pgTable("profile", {
 
 export const insertProfileSchema = createInsertSchema(profileTable).omit({
   id: true,
+  userId: true,
   updatedAt: true,
 });
 export type InsertProfile = z.infer<typeof insertProfileSchema>;

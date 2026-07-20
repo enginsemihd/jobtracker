@@ -23,7 +23,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -272,6 +272,167 @@ async function fetchRemoteOK(keyword: string): Promise<JobListing[]> {
   }
 }
 
+// ─── Arbeitnow (official public API, no key required; Europe-focused) ────────
+async function fetchArbeitnow(keyword: string, remoteOnly: boolean): Promise<JobListing[]> {
+  const out: JobListing[] = [];
+
+  try {
+    for (let page = 1; page <= MAX_PAGES_PER_SOURCE; page++) {
+      const params = new URLSearchParams({ search: keyword, page: String(page) });
+      const res = await fetch(`https://www.arbeitnow.com/api/job-board-api?${params}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        data?: Array<{
+          slug?: string; title?: string; company_name?: string; location?: string;
+          remote?: boolean; url?: string; tags?: string[]; created_at?: number;
+          description?: string;
+        }>;
+      };
+
+      const jobs = data.data ?? [];
+      if (jobs.length === 0) break;
+
+      for (const j of jobs) {
+        if (!j.url) continue;
+        if (remoteOnly && !j.remote) continue;
+        out.push({
+          id: `arbeitnow-${j.slug ?? `${page}-${out.length}`}`,
+          title: j.title ?? "",
+          company: j.company_name ?? "",
+          location: j.location || "",
+          country: null,
+          salary: null,
+          source: "Arbeitnow",
+          postedAt: j.created_at ? new Date(j.created_at * 1000).toISOString() : null,
+          jobUrl: j.url,
+          snippet: j.description?.replace(/<[^>]+>/g, "").slice(0, 300) || null,
+          isRemote: !!j.remote,
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (jobs.length < PAGE_SIZE) break;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/abort — return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
+// ─── Jobicy (official public API, no key required; remote jobs) ──────────────
+async function fetchJobicy(keyword: string): Promise<JobListing[]> {
+  try {
+    const params = new URLSearchParams({ count: "50", tag: keyword });
+    const res = await fetch(`https://jobicy.com/api/v2/remote-jobs?${params}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      jobs?: Array<{
+        id?: number; url?: string; jobTitle?: string; companyName?: string;
+        jobGeo?: string; pubDate?: string; jobExcerpt?: string;
+      }>;
+    };
+
+    return (data.jobs ?? [])
+      .filter((j) => j.url && j.jobTitle)
+      .slice(0, MAX_RESULTS_PER_SOURCE)
+      .map((j) => ({
+        id: `jobicy-${j.id ?? Math.random()}`,
+        title: j.jobTitle ?? "",
+        company: j.companyName ?? "",
+        location: j.jobGeo || "Remote",
+        country: null,
+        salary: null,
+        source: "Jobicy" as const,
+        postedAt: j.pubDate || null,
+        jobUrl: j.url ?? "",
+        snippet: j.jobExcerpt || null,
+        isRemote: true,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Reed (official UK jobs API; free key, basic auth as username) ───────────
+async function fetchReed(keyword: string, remoteOnly: boolean, city?: string): Promise<JobListing[]> {
+  const apiKey = process.env.REED_API_KEY;
+  if (!apiKey) return [];
+
+  const out: JobListing[] = [];
+  const auth = Buffer.from(`${apiKey}:`).toString("base64");
+  const RESULTS_PER_PAGE = 100;
+
+  try {
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page++) {
+      const params = new URLSearchParams({
+        keywords: keyword,
+        resultsToTake: String(RESULTS_PER_PAGE),
+        resultsToSkip: String(page * RESULTS_PER_PAGE),
+      });
+      if (city) params.set("locationName", city);
+      if (remoteOnly) params.set("fullTime", "true");
+
+      const res = await fetch(`https://www.reed.co.uk/api/1.0/search?${params}`, {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        totalResults?: number;
+        results?: Array<{
+          jobId?: number; jobTitle?: string; employerName?: string; locationName?: string;
+          minimumSalary?: number; maximumSalary?: number; currency?: string;
+          date?: string; jobUrl?: string; jobDescription?: string;
+        }>;
+      };
+
+      const jobs = data.results ?? [];
+      if (jobs.length === 0) break;
+
+      for (const j of jobs) {
+        if (!j.jobUrl) continue;
+        const salary = j.minimumSalary && j.maximumSalary
+          ? `${j.currency ?? "GBP"} ${j.minimumSalary.toLocaleString()} – ${j.maximumSalary.toLocaleString()}`
+          : j.minimumSalary ? `${j.currency ?? "GBP"} ${j.minimumSalary.toLocaleString()}+` : null;
+
+        out.push({
+          id: `reed-${j.jobId ?? `${page}-${out.length}`}`,
+          title: j.jobTitle ?? "",
+          company: j.employerName ?? "",
+          location: j.locationName || "UK",
+          country: "United Kingdom",
+          salary,
+          source: "Reed",
+          postedAt: j.date || null,
+          jobUrl: j.jobUrl,
+          snippet: j.jobDescription?.slice(0, 300) || null,
+          isRemote: remoteOnly || /remote/i.test(j.locationName ?? ""),
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (typeof data.totalResults === "number" && out.length >= data.totalResults) break;
+      if (jobs.length < RESULTS_PER_PAGE) break;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/abort — return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
 // ─── LinkedIn (public guest jobs API, no key required) ───────────────────────
 // Searches LinkedIn's publicly-accessible guest job search endpoint using
 // cheerio to parse the HTML job cards it returns.
@@ -425,14 +586,19 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   // no country specified, OR a city is given (city searches always mix in remote).
   const shouldFetchRemote = remoteOnly || !country || !!city;
   const isTurkey = country.toLowerCase() === "turkey";
+  const isUK = ["united kingdom", "uk", "gb", "great britain"].includes(country.toLowerCase());
+  const shouldFetchReed = isUK || !country;
 
-  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin] = await Promise.allSettled([
+  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin, arbeitnow, jobicy, reed] = await Promise.allSettled([
     fetchJooble(keyword, country, remoteOnly, city),
     fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city, jobType),
     isTurkey ? fetchIskur(keyword, country) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemotive(keyword) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemoteOK(keyword) : Promise.resolve([]),
     liLocation ? fetchLinkedIn(keyword, liLocation, liWorkTypes, maxDaysOld, jobType) : Promise.resolve([]),
+    fetchArbeitnow(keyword, remoteOnly),
+    shouldFetchRemote ? fetchJobicy(keyword) : Promise.resolve([]),
+    shouldFetchReed ? fetchReed(keyword, remoteOnly, city) : Promise.resolve([]),
   ]);
 
   const all: JobListing[] = [
@@ -442,6 +608,9 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     ...(remotive.status === "fulfilled" ? remotive.value : []),
     ...(remoteOK.status === "fulfilled" ? remoteOK.value : []),
     ...(linkedin.status === "fulfilled" ? linkedin.value : []),
+    ...(arbeitnow.status === "fulfilled" ? arbeitnow.value : []),
+    ...(jobicy.status === "fulfilled" ? jobicy.value : []),
+    ...(reed.status === "fulfilled" ? reed.value : []),
   ];
 
   const deduped = deduplicate(all);

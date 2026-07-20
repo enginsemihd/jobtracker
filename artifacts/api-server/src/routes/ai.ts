@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { db, applicationsTable, profileTable, tailoredContentTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { TailorMaterialsBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 
@@ -33,6 +33,7 @@ ATS KEYWORDS:
 const router: IRouter = Router();
 
 router.post("/ai/tailor", async (req, res): Promise<void> => {
+  const userId = req.userId!;
   const parsed = TailorMaterialsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -42,7 +43,12 @@ router.post("/ai/tailor", async (req, res): Promise<void> => {
   const [application] = await db
     .select()
     .from(applicationsTable)
-    .where(eq(applicationsTable.id, parsed.data.applicationId));
+    .where(
+      and(
+        eq(applicationsTable.id, parsed.data.applicationId),
+        eq(applicationsTable.userId, userId)
+      )
+    );
 
   if (!application) {
     res.status(404).json({ error: "Application not found" });
@@ -56,7 +62,11 @@ router.post("/ai/tailor", async (req, res): Promise<void> => {
     return;
   }
 
-  const [profile] = await db.select().from(profileTable).limit(1);
+  const [profile] = await db
+    .select()
+    .from(profileTable)
+    .where(eq(profileTable.userId, userId))
+    .limit(1);
 
   if (!profile || !profile.resumeText) {
     res.status(400).json({

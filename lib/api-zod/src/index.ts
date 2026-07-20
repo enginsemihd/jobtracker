@@ -14,6 +14,19 @@ export const StatusEnum = z.enum(STATUS_VALUES);
 // Health
 export const HealthCheckResponse = z.object({ status: z.string() });
 
+// Auth
+export const RegisterBody = z.object({
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),
+  password: z.string().min(6).max(128),
+});
+export const LoginBody = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1),
+});
+export const GoogleAuthBody = z.object({
+  credential: z.string().min(1),
+});
+
 // Applications — list
 export const ListApplicationsQueryParams = z.object({
   status: z.string().optional(),

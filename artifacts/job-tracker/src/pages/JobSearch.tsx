@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateApplication, getListApplicationsQueryKey, getGetDashboardStatsQueryKey } from "@workspace/api-client-react";
 import {
   Search, Loader2, MapPin, Building2, ExternalLink, BookmarkPlus,
-  Check, Wifi, AlertCircle, CalendarDays, GitMerge, Send, Briefcase,
+  Check, Wifi, AlertCircle, CalendarDays, GitMerge, Send, Briefcase, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,78 @@ const EUROPEAN_COUNTRIES = [
   "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey",
   "Ukraine", "United Kingdom",
 ];
+
+// Country → Indeed country-subdomain (Indeed has no public search API; these
+// are plain deep-links to Indeed's own search page — no scraping, no data
+// pulled server-side, just a prefilled URL the user opens themselves).
+const INDEED_DOMAINS: Record<string, string> = {
+  "united kingdom": "uk", germany: "de", france: "fr", netherlands: "nl",
+  poland: "pl", italy: "it", spain: "es", turkey: "tr", austria: "at",
+  belgium: "be", switzerland: "ch", ireland: "ie", portugal: "pt",
+  sweden: "se", norway: "no", denmark: "dk", finland: "fi",
+  "czech republic": "cz", hungary: "hu", romania: "ro", greece: "gr",
+};
+
+interface QuickSearchLink {
+  name: string;
+  url: string;
+}
+
+// Builds "search on this site" links for boards with no public API (Indeed,
+// Monster, Glassdoor, …) plus a few region-specific boards. These only ever
+// open the site's own search page in a new tab — nothing is fetched or
+// scraped; the user applies there directly.
+function buildQuickSearchLinks(keyword: string, city: string, country: string): QuickSearchLink[] {
+  const q = keyword.trim();
+  if (!q) return [];
+
+  const loc = [city, country !== "Any" ? country : ""].filter(Boolean).join(", ");
+  const encQ = encodeURIComponent(q);
+  const encLoc = encodeURIComponent(loc);
+
+  const indeedSub = INDEED_DOMAINS[country.toLowerCase()];
+  const indeedHost = indeedSub ? `${indeedSub}.indeed.com` : "www.indeed.com";
+
+  const links: QuickSearchLink[] = [
+    { name: "Indeed", url: `https://${indeedHost}/jobs?q=${encQ}${loc ? `&l=${encLoc}` : ""}` },
+    { name: "LinkedIn", url: `https://www.linkedin.com/jobs/search/?keywords=${encQ}${loc ? `&location=${encLoc}` : ""}` },
+    { name: "Glassdoor", url: `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encQ}` },
+    { name: "Monster", url: `https://www.monster.com/jobs/search/?q=${encQ}${loc ? `&where=${encLoc}` : ""}` },
+    { name: "ZipRecruiter", url: `https://www.ziprecruiter.com/jobs-search?search=${encQ}${loc ? `&location=${encLoc}` : ""}` },
+    { name: "SimplyHired", url: `https://www.simplyhired.com/search?q=${encQ}${loc ? `&l=${encLoc}` : ""}` },
+    { name: "CareerBuilder", url: `https://www.careerbuilder.com/jobs?keywords=${encQ}${loc ? `&location=${encLoc}` : ""}` },
+  ];
+
+  if (country === "United Kingdom") {
+    links.push(
+      { name: "Totaljobs", url: `https://www.totaljobs.com/jobs/${encodeURIComponent(q.replace(/\s+/g, "-"))}` },
+      { name: "CV-Library", url: `https://www.cv-library.co.uk/search-jobs?q=${encQ}${city ? `&geo=${encodeURIComponent(city)}` : ""}` },
+    );
+  }
+  if (country === "Poland") {
+    links.push(
+      { name: "Pracuj.pl", url: `https://www.pracuj.pl/praca/${encQ};kw` },
+      { name: "Just Join IT", url: `https://justjoin.it/job-offers/all-locations` },
+      { name: "NoFluffJobs", url: `https://nofluffjobs.com/pl/jobs?criteria=${encQ}` },
+      { name: "OLX Praca", url: `https://www.olx.pl/praca/q-${encodeURIComponent(q.replace(/\s+/g, "-"))}/` },
+      { name: "eRecruiter", url: `https://www.erecruiter.pl/praca` },
+    );
+  }
+  if (country === "Turkey") {
+    links.push(
+      { name: "Kariyer.net", url: `https://www.kariyer.net/is-ilanlari?q=${encQ}` },
+      { name: "Yenibiris", url: `https://www.yenibiris.com/is-ilanlari?q=${encQ}` },
+    );
+  }
+  if (["Germany", "Austria", "Switzerland"].includes(country)) {
+    links.push({
+      name: "StepStone",
+      url: `https://www.stepstone.de/jobs/${encQ}/in-${encodeURIComponent(city || country)}`,
+    });
+  }
+
+  return links;
+}
 
 const JOB_TYPES = [
   { value: "any",        label: "Any type" },
@@ -60,12 +132,15 @@ function parseKeyword(raw: string): { cleanKeyword: string; inferredJobType: str
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  Jooble:   "bg-blue-100 text-blue-700 border-blue-200",
-  Adzuna:   "bg-violet-100 text-violet-700 border-violet-200",
-  Remotive: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  RemoteOK: "bg-orange-100 text-orange-700 border-orange-200",
-  ISKUR:    "bg-rose-100 text-rose-700 border-rose-200",
-  LinkedIn: "bg-sky-100 text-sky-700 border-sky-200",
+  Jooble:    "bg-blue-100 text-blue-700 border-blue-200",
+  Adzuna:    "bg-violet-100 text-violet-700 border-violet-200",
+  Remotive:  "bg-emerald-100 text-emerald-700 border-emerald-200",
+  RemoteOK:  "bg-orange-100 text-orange-700 border-orange-200",
+  ISKUR:     "bg-rose-100 text-rose-700 border-rose-200",
+  LinkedIn:  "bg-sky-100 text-sky-700 border-sky-200",
+  Arbeitnow: "bg-amber-100 text-amber-700 border-amber-200",
+  Jobicy:    "bg-teal-100 text-teal-700 border-teal-200",
+  Reed:      "bg-red-100 text-red-700 border-red-200",
 };
 
 interface JobListing {
@@ -75,7 +150,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -288,6 +363,33 @@ export default function JobSearch() {
           </div>
         </form>
 
+        {/* Master search — direct links to boards with no public API (Indeed,
+            Monster, Glassdoor, …). Opens their own search page in a new tab;
+            nothing is fetched here — you apply on that site. */}
+        {keyword.trim() && (
+          <div className="bg-card border border-border rounded-lg p-4">
+            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Globe size={13} />
+              Also search directly on
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {buildQuickSearchLinks(keyword, city, country).map((link) => (
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border bg-muted/50 hover:bg-muted text-foreground transition-colors"
+                  data-testid={`quicklink-${link.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`}
+                >
+                  {link.name}
+                  <ExternalLink size={11} />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Error */}
         {searchError && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-2" data-testid="search-error">
@@ -301,7 +403,7 @@ export default function JobSearch() {
           <div className="space-y-3" data-testid="search-loading">
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Loader2 size={12} className="animate-spin" />
-              Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK…
+              Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy…
             </p>
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="bg-card border border-border rounded-lg p-4 animate-pulse">
@@ -327,7 +429,7 @@ export default function JobSearch() {
                 {results.length} result{results.length !== 1 ? "s" : ""} found
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR"] as const).map((src) => {
+                {(["Jooble", "Adzuna", "LinkedIn", "Remotive", "RemoteOK", "ISKUR", "Arbeitnow", "Jobicy", "Reed"] as const).map((src) => {
                   const count = results.filter((r) => r.source === src).length;
                   if (!count) return null;
                   return (
@@ -450,7 +552,7 @@ export default function JobSearch() {
           <div className="text-center py-16 text-muted-foreground" data-testid="search-empty-state">
             <Search size={40} className="mx-auto mb-4 opacity-20" />
             <p className="font-medium">Set your criteria and search</p>
-            <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, and RemoteOK in parallel.</p>
+            <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, and Jobicy in parallel.</p>
             <p className="text-xs mt-0.5 text-muted-foreground/70">Quick Apply opens the posting and logs it as Applied in one click.</p>
           </div>
         )}

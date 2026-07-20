@@ -1,6 +1,7 @@
-import { pgTable, text, serial, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, date, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const APPLICATION_STATUSES = [
   "Saved",
@@ -19,6 +20,9 @@ export const APPLICATION_SOURCES = [
   "Adzuna",
   "Remotive",
   "RemoteOK",
+  "Arbeitnow",
+  "Jobicy",
+  "Reed",
   "Greenhouse",
   "Lever",
 ] as const;
@@ -27,6 +31,9 @@ export type ApplicationSource = (typeof APPLICATION_SOURCES)[number];
 
 export const applicationsTable = pgTable("applications", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   companyName: text("company_name").notNull(),
   roleTitle: text("role_title").notNull(),
   country: text("country"),
@@ -43,6 +50,7 @@ export const applicationsTable = pgTable("applications", {
 
 export const insertApplicationSchema = createInsertSchema(applicationsTable).omit({
   id: true,
+  userId: true,
   dateAdded: true,
 });
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
