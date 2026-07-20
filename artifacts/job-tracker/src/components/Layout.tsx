@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Plus, User, Menu, X, Briefcase, Search, LogOut } from "lucide-react";
+import { LayoutDashboard, Plus, User, Menu, X, Briefcase, Search, LogOut, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/hooks/use-theme";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -15,6 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="flex h-screen bg-background" data-testid="layout">
@@ -52,6 +54,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <button
+            onClick={toggleTheme}
+            data-testid="button-theme-toggle"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
+          <button
             onClick={logout}
             data-testid="button-logout"
             className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
@@ -68,14 +78,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Briefcase className="text-primary" size={18} />
           <span className="font-semibold text-sidebar-foreground">JobTrack</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          data-testid="button-mobile-menu"
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            data-testid="button-theme-toggle-mobile"
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            data-testid="button-mobile-menu"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </Button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
