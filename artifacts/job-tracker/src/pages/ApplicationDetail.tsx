@@ -50,6 +50,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { STATUS_LIST, STATUS_COLORS, type Status } from "@/lib/statusColors";
+import { isSafeUrl } from "@/lib/url";
 
 const EUROPEAN_COUNTRIES = [
   "Austria", "Belgium", "Bulgaria", "Croatia", "Czech Republic", "Denmark",
@@ -63,7 +64,7 @@ const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
   roleTitle: z.string().min(1, "Role title is required"),
   country: z.string().optional(),
-  jobPostingUrl: z.string().optional(),
+  jobPostingUrl: z.string().refine((v) => v === "" || /^https?:\/\//i.test(v), "Must be an http(s) URL").optional(),
   jobDescription: z.string().optional(),
   status: z.string(),
   applicationMethod: z.string().optional(),
@@ -191,7 +192,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
   }
 
   function handleOpenAndApply() {
-    if (application?.jobPostingUrl) {
+    if (isSafeUrl(application?.jobPostingUrl)) {
       window.open(application.jobPostingUrl, "_blank", "noopener,noreferrer");
     }
     // Show "Did you apply?" dialog after a short delay
@@ -310,7 +311,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
   }
 
   const statusColors = STATUS_COLORS[application.status as Status] ?? STATUS_COLORS.Saved;
-  const canApply = application.status === "Saved" && !!application.jobPostingUrl;
+  const canApply = application.status === "Saved" && isSafeUrl(application.jobPostingUrl);
   const hasTailored = !!(resumeBullets || coverLetter || atsKeywords);
 
   return (
@@ -347,7 +348,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          {application.jobPostingUrl && !canApply && (
+          {isSafeUrl(application.jobPostingUrl) && !canApply && (
             <a href={application.jobPostingUrl} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm" data-testid="button-job-link">
                 <ExternalLink size={13} className="mr-1.5" /> Posting
@@ -372,7 +373,7 @@ export default function ApplicationDetail({ id }: { id: string }) {
       </div>
 
       {/* Apply Assist info when applied */}
-      {application.status !== "Saved" && application.jobPostingUrl && (
+      {application.status !== "Saved" && isSafeUrl(application.jobPostingUrl) && (
         <div className="bg-card border border-border rounded-lg p-4 mb-6 flex items-center justify-between gap-4">
           <div className="text-sm text-muted-foreground">
             {application.status === "Applied" ? (

@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { STATUS_LIST, STATUS_COLORS, type Status } from "@/lib/statusColors";
+import { isSafeUrl } from "@/lib/url";
 
 type ViewMode = "kanban" | "list";
 
@@ -74,7 +75,7 @@ function AppCard({
           <p className="text-xs text-muted-foreground truncate mt-0.5">{app.roleTitle}</p>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {app.jobPostingUrl && (
+          {isSafeUrl(app.jobPostingUrl) && (
             <a href={app.jobPostingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`link-job-${app.id}`}>
                 <ExternalLink size={12} />

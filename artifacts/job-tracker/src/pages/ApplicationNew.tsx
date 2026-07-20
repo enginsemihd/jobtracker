@@ -26,7 +26,7 @@ const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
   roleTitle: z.string().min(1, "Role title is required"),
   country: z.string().optional(),
-  jobPostingUrl: z.string().optional(),
+  jobPostingUrl: z.string().refine((v) => v === "" || /^https?:\/\//i.test(v), "Must be an http(s) URL").optional(),
   jobDescription: z.string().optional(),
   status: z.string().default("Saved"),
   source: z.string().default("Manual"),

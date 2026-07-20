@@ -11,6 +11,12 @@ export const STATUS_VALUES = [
 ] as const;
 export const StatusEnum = z.enum(STATUS_VALUES);
 
+// Only http(s) links allowed — blocks javascript:/data: URIs from being
+// stored and later rendered as a raw <a href> (stored XSS via job-board data).
+const SafeUrl = z
+  .string()
+  .refine((v) => v === "" || /^https?:\/\//i.test(v), { message: "Must be an http(s) URL" });
+
 // Health
 export const HealthCheckResponse = z.object({ status: z.string() });
 
@@ -38,7 +44,7 @@ export const CreateApplicationBody = z.object({
   companyName: z.string().min(1),
   roleTitle: z.string().min(1),
   country: z.string().optional(),
-  jobPostingUrl: z.string().optional(),
+  jobPostingUrl: SafeUrl.optional(),
   jobDescription: z.string().optional(),
   status: StatusEnum.optional(),
   source: z.string().optional(),
@@ -60,7 +66,7 @@ export const UpdateApplicationBody = z.object({
   companyName: z.string().optional(),
   roleTitle: z.string().optional(),
   country: z.string().optional(),
-  jobPostingUrl: z.string().optional(),
+  jobPostingUrl: SafeUrl.optional(),
   jobDescription: z.string().optional(),
   status: StatusEnum.optional(),
   source: z.string().optional(),
