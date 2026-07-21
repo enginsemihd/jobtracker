@@ -272,9 +272,15 @@ async function fetchRemoteOK(keyword: string): Promise<JobListing[]> {
   }
 }
 
-// ─── Arbeitnow (official public API, no key required; Europe-focused) ────────
-async function fetchArbeitnow(keyword: string, remoteOnly: boolean): Promise<JobListing[]> {
+// ─── Arbeitnow (official public API, no key required).
+// Despite the name suggesting "Europe-focused", its `search`/`location` query
+// params don't actually filter by location server-side at all (verified: an
+// unfiltered Poland-location scan across 300 live listings found 0 Poland
+// matches — the catalog is effectively Germany-only). We filter client-side
+// on the returned `location` string against the requested city/country. ────
+async function fetchArbeitnow(keyword: string, remoteOnly: boolean, country?: string, city?: string): Promise<JobListing[]> {
   const out: JobListing[] = [];
+  const locationTerms = [city, country].filter((v): v is string => !!v).map((v) => v.toLowerCase());
 
   try {
     for (let page = 1; page <= MAX_PAGES_PER_SOURCE; page++) {
@@ -298,6 +304,7 @@ async function fetchArbeitnow(keyword: string, remoteOnly: boolean): Promise<Job
       for (const j of jobs) {
         if (!j.url) continue;
         if (remoteOnly && !j.remote) continue;
+        if (!remoteOnly && locationTerms.length && !locationTerms.some((t) => (j.location ?? "").toLowerCase().includes(t))) continue;
         out.push({
           id: `arbeitnow-${j.slug ?? `${page}-${out.length}`}`,
           title: j.title ?? "",
@@ -720,7 +727,7 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     shouldFetchRemote ? fetchRemotive(keyword) : Promise.resolve([]),
     shouldFetchRemote ? fetchRemoteOK(keyword) : Promise.resolve([]),
     liLocation ? fetchLinkedIn(keyword, liLocation, liWorkTypes, maxDaysOld, jobType) : Promise.resolve([]),
-    fetchArbeitnow(keyword, remoteOnly),
+    fetchArbeitnow(keyword, remoteOnly, country, city),
     shouldFetchRemote ? fetchJobicy(keyword) : Promise.resolve([]),
     shouldFetchReed ? fetchReed(keyword, remoteOnly, city) : Promise.resolve([]),
     shouldFetchRemote ? fetchHimalayas(keyword) : Promise.resolve([]),
