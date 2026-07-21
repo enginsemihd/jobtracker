@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import * as cheerio from "cheerio";
 import { SearchJobsQueryParams } from "@workspace/api-zod";
+import { db, profileTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -28,6 +30,41 @@ interface JobListing {
   jobUrl: string;
   snippet: string | null;
   isRemote: boolean;
+}
+
+interface ScoredJobListing extends JobListing {
+  matchScore: number; // 0-100, share of the user's profile skills found in title/snippet
+  matchedSkills: string[];
+}
+
+// ─── Profile-relevance scoring ────────────────────────────────────────────────
+// Cache above holds raw, user-agnostic listings — scoring is applied after the
+// cache lookup (hit or miss) so it never bakes one user's profile into data
+// another user's identical search would also read.
+function parseSkills(keySkills: string | null | undefined): string[] {
+  if (!keySkills) return [];
+  return [...new Set(keySkills.split(/[,\n]/).map((s) => s.trim().toLowerCase()).filter(Boolean))];
+}
+
+function scoreListings(listings: JobListing[], skillTerms: string[]): ScoredJobListing[] {
+  const scored = listings.map((j) => {
+    if (skillTerms.length === 0) return { ...j, matchScore: 0, matchedSkills: [] };
+    const haystack = `${j.title} ${j.snippet ?? ""}`.toLowerCase();
+    const matchedSkills = skillTerms.filter((s) => haystack.includes(s));
+    const matchScore = Math.round((matchedSkills.length / skillTerms.length) * 100);
+    return { ...j, matchScore, matchedSkills };
+  });
+  // Stable sort — ties keep their original (source fan-out) order.
+  return scored.sort((a, b) => b.matchScore - a.matchScore);
+}
+
+async function getUserSkillTerms(userId: number): Promise<string[]> {
+  const [profile] = await db
+    .select({ keySkills: profileTable.keySkills })
+    .from(profileTable)
+    .where(eq(profileTable.userId, userId))
+    .limit(1);
+  return parseSkills(profile?.keySkills);
 }
 
 // ─── Jooble (paginated: `page` in POST body, 1-indexed) ──────────────────────
@@ -709,7 +746,8 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   const cacheKey = `${keyword}|${country}|${city ?? ""}|${remoteOnly}|${hybridOnly}|${jobType ?? ""}|${maxDaysOld ?? ""}|${MAX_PAGES_PER_SOURCE}|${MAX_RESULTS_PER_SOURCE}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    res.json(cached.data);
+    const skillTerms = await getUserSkillTerms(req.userId!);
+    res.json(scoreListings(cached.data, skillTerms));
     return;
   }
 
@@ -753,7 +791,8 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
 
   cache.set(cacheKey, { data: results, expiresAt: Date.now() + CACHE_TTL_MS });
 
-  res.json(results);
+  const skillTerms = await getUserSkillTerms(req.userId!);
+  res.json(scoreListings(results, skillTerms));
 });
 
 export default router;

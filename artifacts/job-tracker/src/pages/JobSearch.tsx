@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { ApplicationInputStatus } from "@workspace/api-client-react";
+import { isSafeUrl } from "@/lib/url";
 
 const EUROPEAN_COUNTRIES = [
   "Any", "Austria", "Belgium", "Bulgaria", "Croatia", "Czech Republic",
@@ -131,6 +132,12 @@ function parseKeyword(raw: string): { cleanKeyword: string; inferredJobType: str
   return { cleanKeyword: kw || raw.trim(), inferredJobType };
 }
 
+function matchBadgeColor(score: number): string {
+  if (score >= 50) return "bg-green-100 text-green-700 border-green-200";
+  if (score >= 25) return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+}
+
 const SOURCE_COLORS: Record<string, string> = {
   Jooble:    "bg-blue-100 text-blue-700 border-blue-200",
   Adzuna:    "bg-violet-100 text-violet-700 border-violet-200",
@@ -157,6 +164,8 @@ interface JobListing {
   jobUrl: string;
   snippet: string | null;
   isRemote: boolean;
+  matchScore: number;
+  matchedSkills: string[];
 }
 
 export default function JobSearch() {
@@ -247,7 +256,7 @@ export default function JobSearch() {
 
   async function handleQuickApply(job: JobListing) {
     // Open the posting immediately — don't wait for the DB call.
-    window.open(job.jobUrl, "_blank", "noopener,noreferrer");
+    if (isSafeUrl(job.jobUrl)) window.open(job.jobUrl, "_blank", "noopener,noreferrer");
     const ok = await applyOne(job, "Applied");
     invalidate();
     toast({
@@ -486,6 +495,14 @@ export default function JobSearch() {
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-start gap-2 flex-wrap">
                             <h3 className="font-semibold text-sm text-foreground leading-tight">{job.title}</h3>
+                            {job.matchScore > 0 && (
+                              <span
+                                className={`text-xs rounded-full px-1.5 py-0.5 font-medium shrink-0 border ${matchBadgeColor(job.matchScore)}`}
+                                title={job.matchedSkills.length ? `Matches: ${job.matchedSkills.join(", ")}` : undefined}
+                              >
+                                {job.matchScore}% match
+                              </span>
+                            )}
                             {job.isRemote && (
                               <span className="text-xs bg-teal-100 text-teal-700 border border-teal-200 rounded-full px-1.5 py-0.5 font-medium shrink-0">
                                 Remote
@@ -527,12 +544,14 @@ export default function JobSearch() {
 
                           {/* Secondary: view + save */}
                           <div className="flex gap-1">
-                            <a href={job.jobUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                              <Button variant="outline" size="sm" className="text-xs h-7 w-full"
-                                data-testid={`button-view-${job.id}`}>
-                                <ExternalLink size={11} />
-                              </Button>
-                            </a>
+                            {isSafeUrl(job.jobUrl) && (
+                              <a href={job.jobUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+                                <Button variant="outline" size="sm" className="text-xs h-7 w-full"
+                                  data-testid={`button-view-${job.id}`}>
+                                  <ExternalLink size={11} />
+                                </Button>
+                              </a>
+                            )}
                             <Button size="sm"
                               variant={saved || applied ? "outline" : "secondary"}
                               className="text-xs h-7 flex-1"

@@ -648,11 +648,20 @@ components:
           type: ["string", "null"]
         isRemote:
           type: boolean
+        matchScore:
+          type: integer
+          description: 0-100. Share of the caller's profile key skills found in this listing's title/snippet. 0 when the profile has no key skills set.
+        matchedSkills:
+          type: array
+          items:
+            type: string
       required:
         - id
         - title
         - company
         - location
         - source
+        - matchScore
+        - matchedSkills
         - jobUrl
         - isRemote
