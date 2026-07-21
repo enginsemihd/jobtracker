@@ -96,6 +96,13 @@ export interface TailorResult {
   atsKeywords: string;
 }
 
+export interface ParsedCv {
+  resumeText: string;
+  keySkills: string;
+  careerSummary: string;
+  pastRoles: string;
+}
+
 // ─── HTTP helper ─────────────────────────────────────────────────────────────
 // Same-origin relative path. In dev, Vite proxies /api → the API server.
 // In production, serve the frontend and API on the same origin (or add a proxy).
@@ -319,6 +326,16 @@ export function useUpsertProfile() {
     mutationFn: ({ data }) =>
       http<Profile>("/profile", {
         method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useParseCv() {
+  return useMutation<ParsedCv, ApiError, { fileBase64: string; fileName?: string }>({
+    mutationFn: (data) =>
+      http<ParsedCv>("/profile/parse-cv", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
   });

@@ -292,6 +292,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/Profile"
 
+  /profile/parse-cv:
+    post:
+      operationId: parseCv
+      tags: [profile]
+      summary: Use Claude to read an uploaded CV PDF and extract it into the four profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParseCvRequest"
+      responses:
+        "200":
+          description: Extracted profile fields (not yet saved — caller still calls PUT /profile to persist)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParsedCv"
+        "400":
+          description: Bad request (not a PDF, too large, or invalid file data)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: PDF has no readable resume content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: AI service unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /ai/tailor:
     post:
       operationId: tailorMaterials
@@ -599,6 +636,34 @@ components:
           type: string
         pastRoles:
           type: string
+
+    ParseCvRequest:
+      type: object
+      properties:
+        fileBase64:
+          type: string
+          description: Base64-encoded PDF (no data: URI prefix)
+        fileName:
+          type: string
+      required:
+        - fileBase64
+
+    ParsedCv:
+      type: object
+      properties:
+        resumeText:
+          type: string
+        keySkills:
+          type: string
+        careerSummary:
+          type: string
+        pastRoles:
+          type: string
+      required:
+        - resumeText
+        - keySkills
+        - careerSummary
+        - pastRoles
 
     TailorRequest:
       type: object

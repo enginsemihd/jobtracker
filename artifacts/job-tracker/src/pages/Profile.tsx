@@ -1,15 +1,30 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useGetProfile, useUpsertProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
-import { Save, Loader2, UserCircle, Info } from "lucide-react";
+import { useGetProfile, useUpsertProfile, useParseCv, getGetProfileQueryKey } from "@workspace/api-client-react";
+import { Save, Loader2, UserCircle, Info, Upload, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+
+const MAX_CV_BYTES = 8 * 1024 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is "data:application/pdf;base64,AAAA..." — strip the prefix.
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 const formSchema = z.object({
   resumeText: z.string().optional(),
@@ -23,11 +38,14 @@ type FormValues = z.infer<typeof formSchema>;
 export default function Profile() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const { data: profile, isLoading } = useGetProfile({
     query: { queryKey: getGetProfileQueryKey() },
   });
   const upsertProfile = useUpsertProfile();
+  const parseCv = useParseCv();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -65,6 +83,47 @@ export default function Profile() {
     );
   }
 
+  async function handleCvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast({ title: "Please upload a PDF file", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_CV_BYTES) {
+      toast({ title: "That PDF is too large (max 8MB)", variant: "destructive" });
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    const fileBase64 = await fileToBase64(file);
+
+    parseCv.mutate(
+      { fileBase64, fileName: file.name },
+      {
+        onSuccess: (parsed) => {
+          form.reset({
+            resumeText: parsed.resumeText,
+            keySkills: parsed.keySkills,
+            careerSummary: parsed.careerSummary,
+            pastRoles: parsed.pastRoles,
+          });
+          toast({ title: "CV parsed — review the fields below, then save" });
+        },
+        onError: (err: unknown) => {
+          const message =
+            err && typeof err === "object" && "data" in err
+              ? (err as { data?: { error?: string } }).data?.error ?? "Couldn't parse that CV"
+              : "Couldn't parse that CV";
+          toast({ title: message, variant: "destructive" });
+          setUploadedFileName(null);
+        },
+      }
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-6 py-6">
       <div className="flex items-center gap-3 mb-2">
@@ -79,6 +138,41 @@ export default function Profile() {
         <Info size={14} className="text-amber-600 mt-0.5 shrink-0" />
         <p className="text-xs text-amber-800">
           The more detail you provide — especially in your resume text and past roles — the more targeted and relevant the AI-generated content will be. At minimum, fill in your base resume text.
+        </p>
+      </div>
+
+      <div className="border border-dashed border-border rounded-lg p-4 mb-6" data-testid="cv-upload-section">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={handleCvUpload}
+          data-testid="input-cv-file"
+        />
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={parseCv.isPending}
+            onClick={() => fileInputRef.current?.click()}
+            data-testid="button-upload-cv"
+          >
+            {parseCv.isPending ? (
+              <><Loader2 size={14} className="mr-2 animate-spin" /> Reading your CV…</>
+            ) : (
+              <><Upload size={14} className="mr-2" /> Upload CV (PDF)</>
+            )}
+          </Button>
+          {uploadedFileName && !parseCv.isPending && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <FileText size={12} /> {uploadedFileName}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Auto-fills the fields below from your resume — review and edit before saving. Can take up to 20 seconds. Or skip this and fill them in by hand.
         </p>
       </div>
 

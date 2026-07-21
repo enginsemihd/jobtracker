@@ -97,6 +97,13 @@ export const UpsertProfileBody = z.object({
 // AI tailor request
 export const TailorMaterialsBody = z.object({ applicationId: z.number().int() });
 
+// CV parse request — base64-encoded PDF, capped well under Vercel's request
+// body limit (real cap is enforced server-side against the decoded buffer).
+export const ParseCvBody = z.object({
+  fileBase64: z.string().min(1).max(12_000_000),
+  fileName: z.string().max(255).optional(),
+});
+
 // Job search query
 export const SearchJobsQueryParams = z.object({
   keyword: z.string().min(1),
