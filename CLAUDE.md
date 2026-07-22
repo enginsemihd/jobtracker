@@ -1,6 +1,6 @@
 # JobTrack — Claude Code için proje notları
 
-Bu, kişisel bir iş başvurusu takip uygulamasıdır. AI ile özgeçmiş/ön yazı uyarlama (Claude) ve çok kaynaklı iş arama (Jooble, Adzuna, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork) içerir. Avrupa + Türkiye + UK pazarına odaklıdır. Çoklu kullanıcı destekli (JWT auth, her kullanıcı kendi profili/başvuruları).
+Bu, kişisel bir iş başvurusu takip uygulamasıdır. AI ile özgeçmiş/ön yazı uyarlama (Claude) ve çok kaynaklı iş arama (Jooble, Adzuna, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork, Just Join IT) içerir. Avrupa + Türkiye + UK pazarına odaklıdır. Just Join IT resmi/dokümante bir API değil — kendi sitesinin dahili endpoint'i (api.justjoin.it), sadece country=Poland veya boşken tetiklenir. Çoklu kullanıcı destekli (JWT auth, her kullanıcı kendi profili/başvuruları).
 
 ## Mimari (pnpm monorepo)
 - `artifacts/job-tracker` — React + Vite + Tailwind v4 (ön yüz, port 5173)

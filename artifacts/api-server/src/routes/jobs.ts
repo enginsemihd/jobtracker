@@ -25,7 +25,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork" | "JustJoinIT";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -601,6 +601,78 @@ async function fetchFindwork(keyword: string, remoteOnly: boolean, city?: string
   return out.slice(0, MAX_RESULTS_PER_SOURCE);
 }
 
+// ─── Just Join IT (Poland-focused tech job board; no key required).
+// No official public API — this calls the same internal JSON endpoint
+// (api.justjoin.it) their own site's frontend calls, reverse-engineered from
+// their JS bundle. Same risk profile as the LinkedIn source below: it can
+// change or break without notice since it's not a documented, versioned API. ─
+async function fetchJustJoinIt(keyword: string, remoteOnly: boolean, city?: string): Promise<JobListing[]> {
+  const out: JobListing[] = [];
+  const ITEMS_PER_PAGE = 100;
+
+  try {
+    let from = 0;
+    for (let page = 0; page < MAX_PAGES_PER_SOURCE; page++) {
+      const params = new URLSearchParams({ itemsCount: String(ITEMS_PER_PAGE), from: String(from) });
+      params.append("jobTitles[]", keyword);
+      if (city) params.set("city", city);
+
+      const res = await fetch(`https://api.justjoin.it/v2/user-panel/offers/by-cursor?${params}`, {
+        headers: { "User-Agent": "JobTrack/1.0 (personal job search app)", Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) break;
+
+      const data = (await res.json()) as {
+        meta?: { next?: { cursor?: number | null } | null; totalItems?: number };
+        data?: Array<{
+          guid?: string; slug?: string; title?: string; companyName?: string; city?: string;
+          workplaceType?: string; publishedAt?: string;
+          employmentTypes?: Array<{ from?: number; to?: number; currency?: string }>;
+        }>;
+      };
+
+      const jobs = data.data ?? [];
+      if (jobs.length === 0) break;
+
+      for (const j of jobs) {
+        if (!j.slug || !j.title) continue;
+        if (remoteOnly && j.workplaceType !== "remote") continue;
+        const pay = j.employmentTypes?.[0];
+        const salary = pay?.from && pay?.to
+          ? `${(pay.currency ?? "PLN").toUpperCase()} ${pay.from.toLocaleString()} – ${pay.to.toLocaleString()}`
+          : null;
+
+        out.push({
+          id: `justjoinit-${j.guid ?? j.slug}`,
+          title: j.title,
+          company: j.companyName ?? "",
+          location: j.city || "Poland",
+          country: "Poland",
+          salary,
+          source: "JustJoinIT",
+          postedAt: j.publishedAt || null,
+          jobUrl: `https://justjoin.it/job-offer/${j.slug}`,
+          snippet: null,
+          isRemote: j.workplaceType === "remote",
+        });
+      }
+
+      if (out.length >= MAX_RESULTS_PER_SOURCE) break;
+      if (jobs.length < ITEMS_PER_PAGE) break;
+      const nextCursor = data.meta?.next?.cursor;
+      if (nextCursor == null) break;
+      from = nextCursor;
+
+      await sleep(PAGE_DELAY_MS);
+    }
+  } catch {
+    // network/abort — return what we have
+  }
+
+  return out.slice(0, MAX_RESULTS_PER_SOURCE);
+}
+
 // ─── LinkedIn (public guest jobs API, no key required) ───────────────────────
 // Searches LinkedIn's publicly-accessible guest job search endpoint using
 // cheerio to parse the HTML job cards it returns.
@@ -757,8 +829,10 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
   const isTurkey = country.toLowerCase() === "turkey";
   const isUK = ["united kingdom", "uk", "gb", "great britain"].includes(country.toLowerCase());
   const shouldFetchReed = isUK || !country;
+  const isPoland = country.toLowerCase() === "poland";
+  const shouldFetchJustJoinIt = isPoland || !country;
 
-  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin, arbeitnow, jobicy, reed, himalayas, findwork] = await Promise.allSettled([
+  const [jooble, adzuna, iskur, remotive, remoteOK, linkedin, arbeitnow, jobicy, reed, himalayas, findwork, justJoinIt] = await Promise.allSettled([
     fetchJooble(keyword, country, remoteOnly, city),
     fetchAdzuna(keyword, country, remoteOnly, maxDaysOld, city, jobType),
     isTurkey ? fetchIskur(keyword, country) : Promise.resolve([]),
@@ -770,6 +844,7 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     shouldFetchReed ? fetchReed(keyword, remoteOnly, city) : Promise.resolve([]),
     shouldFetchRemote ? fetchHimalayas(keyword) : Promise.resolve([]),
     fetchFindwork(keyword, remoteOnly, city),
+    shouldFetchJustJoinIt ? fetchJustJoinIt(keyword, remoteOnly, city) : Promise.resolve([]),
   ]);
 
   const all: JobListing[] = [
@@ -784,6 +859,7 @@ router.get("/jobs/search", async (req, res): Promise<void> => {
     ...(reed.status === "fulfilled" ? reed.value : []),
     ...(himalayas.status === "fulfilled" ? himalayas.value : []),
     ...(findwork.status === "fulfilled" ? findwork.value : []),
+    ...(justJoinIt.status === "fulfilled" ? justJoinIt.value : []),
   ];
 
   const deduped = deduplicate(all);

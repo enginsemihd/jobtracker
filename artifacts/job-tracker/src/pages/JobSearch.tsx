@@ -71,7 +71,6 @@ function buildQuickSearchLinks(keyword: string, city: string, country: string): 
   if (country === "Poland") {
     links.push(
       { name: "Pracuj.pl", url: `https://www.pracuj.pl/praca/${encQ};kw` },
-      { name: "Just Join IT", url: `https://justjoin.it/job-offers/all-locations` },
       { name: "NoFluffJobs", url: `https://nofluffjobs.com/pl/jobs?criteria=${encQ}` },
       { name: "OLX Praca", url: `https://www.olx.pl/praca/q-${encodeURIComponent(q.replace(/\s+/g, "-"))}/` },
       { name: "eRecruiter", url: `https://www.erecruiter.pl/praca` },
@@ -153,7 +152,7 @@ interface JobListing {
   location: string;
   country: string | null;
   salary: string | null;
-  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork";
+  source: "Jooble" | "Adzuna" | "Remotive" | "RemoteOK" | "ISKUR" | "LinkedIn" | "Arbeitnow" | "Jobicy" | "Reed" | "Himalayas" | "Findwork" | "JustJoinIT";
   postedAt: string | null;
   jobUrl: string;
   snippet: string | null;
@@ -518,7 +517,7 @@ export default function JobSearch() {
             <div className="space-y-3" data-testid="search-loading">
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Loader2 size={12} className="animate-spin" />
-                Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork…
+                Searching Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork, Just Join IT…
               </p>
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="bg-card border border-border rounded-2xl p-4 animate-pulse">
@@ -627,7 +626,7 @@ export default function JobSearch() {
             <div className="text-center py-16 text-muted-foreground" data-testid="search-empty-state">
               <Search size={40} className="mx-auto mb-4 opacity-20" />
               <p className="font-medium text-foreground">Set your criteria and search</p>
-              <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, and Findwork in parallel.</p>
+              <p className="text-xs mt-1">Hits Jooble, Adzuna, LinkedIn, Remotive, RemoteOK, Arbeitnow, Jobicy, Reed, Himalayas, Findwork, and Just Join IT in parallel.</p>
               <p className="text-xs mt-0.5 text-muted-foreground/70">Quick Apply opens the posting and logs it as Applied in one click.</p>
             </div>
           )}

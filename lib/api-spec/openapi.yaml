@@ -704,7 +704,7 @@ components:
           type: ["string", "null"]
         source:
           type: string
-          enum: [Jooble, Adzuna, Remotive, RemoteOK, ISKUR, LinkedIn, Arbeitnow, Jobicy, Reed, Himalayas, Findwork]
+          enum: [Jooble, Adzuna, Remotive, RemoteOK, ISKUR, LinkedIn, Arbeitnow, Jobicy, Reed, Himalayas, Findwork, JustJoinIT]
         postedAt:
           type: ["string", "null"]
         jobUrl:
