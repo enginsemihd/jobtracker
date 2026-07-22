@@ -11,11 +11,11 @@ import {
   getGetDashboardStatsQueryKey,
   getGetOverdueFollowUpsQueryKey,
 } from "@workspace/api-client-react";
-import { Plus, LayoutGrid, List, AlertTriangle, Trash2, ExternalLink, ChevronRight } from "lucide-react";
+import { Plus, LayoutGrid, List, AlertTriangle, Trash2, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +33,12 @@ type ViewMode = "kanban" | "list";
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-4" data-testid={`stat-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</p>
-      <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+    <div
+      className="bg-card border border-border rounded-[14px] p-4 shadow-card"
+      data-testid={`stat-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    >
+      <p className="text-[11px] text-muted-foreground uppercase tracking-[0.06em] font-semibold">{label}</p>
+      <p className="font-display text-[26px] font-bold text-foreground mt-1">{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
@@ -58,7 +61,6 @@ function AppCard({
   onDragStart: (e: React.DragEvent, id: number) => void;
   onDelete: (id: number) => void;
 }) {
-  const colors = STATUS_COLORS[app.status as Status] ?? STATUS_COLORS.Saved;
   const today = new Date().toISOString().split("T")[0];
   const isOverdue = app.followUpDate && app.followUpDate < today;
 
@@ -66,15 +68,17 @@ function AppCard({
     <div
       draggable
       onDragStart={(e) => onDragStart(e, app.id)}
-      className="bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow group"
+      className="bg-card border border-border rounded-[10px] p-3 cursor-grab active:cursor-grabbing shadow-card hover:border-ember-tint-border hover:-translate-y-px transition-all group"
       data-testid={`card-application-${app.id}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-foreground truncate">{app.companyName}</p>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{app.roleTitle}</p>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="flex items-center justify-center w-6 h-6 rounded-[7px] bg-chip text-[11px] font-bold text-muted-foreground shrink-0">
+            {app.companyName.charAt(0).toUpperCase()}
+          </span>
+          <p className="font-bold text-[13.5px] text-foreground truncate">{app.companyName}</p>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           {isSafeUrl(app.jobPostingUrl) && (
             <a href={app.jobPostingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`link-job-${app.id}`}>
@@ -93,19 +97,20 @@ function AppCard({
           </Button>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-muted-foreground">
+      <p className="text-[12.5px] text-muted-foreground truncate mt-1">{app.roleTitle}</p>
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        <span className="text-[11.5px] font-semibold text-muted-foreground bg-chip px-2 py-0.5 rounded-full">
           {new Date(app.dateAdded).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </span>
         {isOverdue && (
-          <span className="flex items-center gap-1 text-xs text-amber-600">
+          <span className="flex items-center gap-1 text-[11.5px] font-semibold text-ochre bg-ochre-tint px-2 py-0.5 rounded-full">
             <AlertTriangle size={10} />
-            Follow-up
+            Follow up
           </span>
         )}
       </div>
       <Link href={`/applications/${app.id}`}>
-        <button className="w-full text-left mt-2 text-xs text-primary hover:underline" data-testid={`link-detail-${app.id}`}>
+        <button className="w-full text-left mt-2 text-xs text-ember hover:underline" data-testid={`link-detail-${app.id}`}>
           View details
         </button>
       </Link>
@@ -119,6 +124,7 @@ export default function Dashboard() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: applications, isLoading: appsLoading } = useListApplications();
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
@@ -171,11 +177,13 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full animate-rise">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4 flex items-center justify-between gap-4 bg-background">
+      <div className="border-b border-border px-8 py-5 flex items-center justify-between gap-4 flex-wrap bg-background">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
+          <h1 className="font-display text-[28px] font-bold tracking-tight text-foreground">
+            {user ? `Good morning, ${user.username}` : "Dashboard"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Track your job search progress</p>
         </div>
         <div className="flex items-center gap-2">
@@ -195,47 +203,49 @@ export default function Dashboard() {
           >
             <List size={14} className="mr-1.5" /> List
           </Button>
+          <Link href="/jobs">
+            <Button variant="outline" size="sm" className="shadow-card">
+              <Search size={14} className="mr-1.5" /> Find jobs
+            </Button>
+          </Link>
           <Link href="/applications/new">
             <Button size="sm" data-testid="button-new-application">
-              <Plus size={14} className="mr-1.5" /> New
+              <Plus size={14} className="mr-1.5" /> Add application
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-8 space-y-4">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           {statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 rounded-lg" />
+              <Skeleton key={i} className="h-20 rounded-[14px]" />
             ))
           ) : (
             <>
-              <StatCard label="Total" value={stats?.total ?? 0} />
-              <StatCard label="Applied This Week" value={stats?.appliedThisWeek ?? 0} />
-              <StatCard label="Response Rate" value={`${stats?.responseRate ?? 0}%`} />
-              <StatCard label="Overdue Follow-ups" value={stats?.overdueFollowUps ?? 0} />
+              <StatCard label="In play" value={stats?.total ?? 0} sub="applications still active" />
+              <StatCard label="This week" value={stats?.appliedThisWeek ?? 0} sub="applications" />
+              <StatCard label="Response rate" value={`${stats?.responseRate ?? 0}%`} />
+              <StatCard label="Needs follow-up" value={stats?.overdueFollowUps ?? 0} />
             </>
           )}
         </div>
 
-        {/* Overdue follow-ups banner */}
+        {/* Overdue follow-ups */}
         {overdueFollowUps && overdueFollowUps.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4" data-testid="banner-follow-ups">
+          <div className="bg-ochre-tint border border-ochre/20 rounded-[14px] p-4 shadow-card" data-testid="banner-follow-ups">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle size={16} className="text-amber-600" />
-              <span className="text-sm font-semibold text-amber-800">Needs Follow-up</span>
+              <AlertTriangle size={15} className="text-ochre" />
+              <span className="text-[13.5px] font-bold text-foreground">Needs follow-up</span>
             </div>
             <div className="space-y-1">
               {overdueFollowUps.map((app) => (
                 <Link key={app.id} href={`/applications/${app.id}`}>
-                  <div className="flex items-center justify-between text-sm text-amber-700 hover:text-amber-900 cursor-pointer py-0.5" data-testid={`follow-up-${app.id}`}>
+                  <div className="flex items-center justify-between text-[13px] text-foreground hover:text-ember cursor-pointer py-1" data-testid={`follow-up-${app.id}`}>
                     <span>{app.companyName} — {app.roleTitle}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs">{app.followUpDate}</span>
-                      <ChevronRight size={12} />
-                    </div>
+                    <span className="text-xs text-muted-foreground">{app.followUpDate}</span>
                   </div>
                 </Link>
               ))}
@@ -245,60 +255,69 @@ export default function Dashboard() {
 
         {/* Kanban Board */}
         {view === "kanban" && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="kanban-board">
-            {STATUS_LIST.map((status) => {
-              const colors = STATUS_COLORS[status];
-              const cards = appsByStatus[status] ?? [];
-              return (
-                <div
-                  key={status}
-                  className={`bg-muted/40 rounded-lg border-t-2 ${colors.column} ${
-                    dragOverStatus === status ? "ring-2 ring-primary/30" : ""
-                  } transition-all`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }}
-                  onDragLeave={() => setDragOverStatus(null)}
-                  onDrop={(e) => handleDrop(e, status)}
-                  data-testid={`column-${status.toLowerCase()}`}
-                >
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-                    <span className="text-xs font-semibold text-foreground">{status}</span>
-                    <span className="text-xs font-medium text-muted-foreground bg-background rounded-full w-5 h-5 flex items-center justify-center">
-                      {cards.length}
-                    </span>
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <h2 className="font-display text-lg font-bold text-foreground">Your pipeline</h2>
+              <span className="text-xs text-muted-foreground">Drag cards between stages</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="kanban-board">
+              {STATUS_LIST.map((status) => {
+                const colors = STATUS_COLORS[status];
+                const cards = appsByStatus[status] ?? [];
+                return (
+                  <div
+                    key={status}
+                    className={`bg-sidebar rounded-[12px] border border-border ${
+                      dragOverStatus === status ? "ring-2 ring-primary/30" : ""
+                    } transition-all`}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status); }}
+                    onDragLeave={() => setDragOverStatus(null)}
+                    onDrop={(e) => handleDrop(e, status)}
+                    data-testid={`column-${status.toLowerCase()}`}
+                  >
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 text-[12.5px] font-bold text-foreground">
+                        <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                        {status}
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {cards.length}
+                      </span>
+                    </div>
+                    <div className="p-2 space-y-2 min-h-[80px]">
+                      {appsLoading ? (
+                        <Skeleton className="h-16 rounded-[10px]" />
+                      ) : cards.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4 border border-dashed border-border rounded-[10px]">Nothing here yet</p>
+                      ) : (
+                        cards.map((app) => (
+                          <AppCard
+                            key={app.id}
+                            app={app}
+                            onDragStart={handleDragStart}
+                            onDelete={(id) => setDeleteId(id)}
+                          />
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <div className="p-2 space-y-2 min-h-[80px]">
-                    {appsLoading ? (
-                      <Skeleton className="h-16 rounded-md" />
-                    ) : cards.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-4 italic">Drop here</p>
-                    ) : (
-                      cards.map((app) => (
-                        <AppCard
-                          key={app.id}
-                          app={app}
-                          onDragStart={handleDragStart}
-                          onDelete={(id) => setDeleteId(id)}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* List View */}
         {view === "list" && (
-          <div className="bg-card border border-border rounded-lg overflow-hidden" data-testid="list-view">
+          <div className="bg-card border border-border rounded-[14px] overflow-hidden shadow-card" data-testid="list-view">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Company</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Role</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden md:table-cell">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden md:table-cell">Added</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden lg:table-cell">Follow-up</th>
+                <tr className="border-b border-border bg-chip">
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-[0.06em]">Company</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-[0.06em]">Role</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-[0.06em] hidden md:table-cell">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-[0.06em] hidden md:table-cell">Added</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-[0.06em] hidden lg:table-cell">Follow-up</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -316,7 +335,7 @@ export default function Dashboard() {
                     <td colSpan={6} className="px-4 py-12 text-center">
                       <p className="text-muted-foreground text-sm">No applications yet.</p>
                       <Link href="/applications/new">
-                        <Button variant="link" size="sm" className="mt-2" data-testid="button-empty-new">
+                        <Button variant="link" size="sm" className="mt-2 text-ember" data-testid="button-empty-new">
                           Add your first application
                         </Button>
                       </Link>
@@ -330,10 +349,10 @@ export default function Dashboard() {
                     return (
                       <tr
                         key={app.id}
-                        className="border-b border-border hover:bg-muted/30 transition-colors"
+                        className="border-b border-border hover:bg-chip/50 transition-colors"
                         data-testid={`row-application-${app.id}`}
                       >
-                        <td className="px-4 py-3 font-medium text-foreground">{app.companyName}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{app.companyName}</td>
                         <td className="px-4 py-3 text-muted-foreground">{app.roleTitle}</td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${colors.badge}`}>
@@ -346,7 +365,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
                           {app.followUpDate ? (
-                            <span className={`text-xs ${isOverdue ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+                            <span className={`text-xs ${isOverdue ? "text-ochre font-medium" : "text-muted-foreground"}`}>
                               {isOverdue && <AlertTriangle size={10} className="inline mr-1" />}
                               {app.followUpDate}
                             </span>
@@ -396,7 +415,7 @@ export default function Dashboard() {
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-[14px]">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete application?</AlertDialogTitle>
             <AlertDialogDescription>

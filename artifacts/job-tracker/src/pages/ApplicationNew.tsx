@@ -38,6 +38,15 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+function SectionCard({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-[14px] p-5 shadow-card">
+      <h2 className="text-[14.5px] font-bold text-foreground mb-3.5">{title}</h2>
+      <div className="flex flex-col gap-3.5">{children}</div>
+    </div>
+  );
+}
+
 export default function ApplicationNew() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -93,200 +102,217 @@ export default function ApplicationNew() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-6">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="max-w-[680px] mx-auto px-8 py-7 animate-rise">
+      <div className="flex items-center gap-3 mb-5">
         <Link href="/">
           <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
             <ArrowLeft size={16} />
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-foreground">New Application</h1>
-          <p className="text-sm text-muted-foreground">Track a new job opportunity</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Track a new application</h1>
+          <p className="text-sm text-muted-foreground">Every application you log is progress — even the long shots.</p>
         </div>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" data-testid="form-new-application">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="companyName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Acme Corp" data-testid="input-company-name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="roleTitle"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role Title *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Senior Engineer" data-testid="input-role-title" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="country"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Country / Location</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4" data-testid="form-new-application">
+          <SectionCard title="The basics">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Company Name *</FormLabel>
                     <FormControl>
-                      <SelectTrigger data-testid="select-country">
-                        <SelectValue placeholder="Select country..." />
-                      </SelectTrigger>
+                      <Input placeholder="Acme Corp" data-testid="input-company-name" className="h-10 rounded-[9px] bg-background" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Remote - EU">Remote - EU</SelectItem>
-                      <SelectItem value="Remote - Global">Remote - Global</SelectItem>
-                      {EUROPEAN_COUNTRIES.filter(c => !c.startsWith("Remote")).map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="roleTitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Role Title *</FormLabel>
                     <FormControl>
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
+                      <Input placeholder="Senior Engineer" data-testid="input-role-title" className="h-10 rounded-[9px] bg-background" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {STATUS_LIST.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <FormField
-            control={form.control}
-            name="jobPostingUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Job Posting URL</FormLabel>
-                <FormControl>
-                  <Input placeholder="https://company.com/jobs/123" data-testid="input-job-url" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Country / Location</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-country" className="h-10 rounded-[9px] bg-background">
+                          <SelectValue placeholder="Select country..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Remote - EU">Remote - EU</SelectItem>
+                        <SelectItem value="Remote - Global">Remote - Global</SelectItem>
+                        {EUROPEAN_COUNTRIES.filter(c => !c.startsWith("Remote")).map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Stage</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status" className="h-10 rounded-[9px] bg-background">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {STATUS_LIST.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <FormField
-            control={form.control}
-            name="jobDescription"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Job Description</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Paste the full job description here. This is used by the AI tailoring assistant to generate personalized resume bullets and cover letter content."
-                    rows={8}
-                    data-testid="textarea-job-description"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="applicationMethod"
+              name="jobPostingUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Application Method</FormLabel>
+                  <FormLabel className="text-xs font-semibold text-muted-foreground">Job Posting URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="Company site, Referral, Email..." data-testid="input-method" {...field} />
+                    <Input placeholder="https://company.com/jobs/123" data-testid="input-job-url" className="h-10 rounded-[9px] bg-background" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+          </SectionCard>
+
+          <SectionCard
+            title={
+              <span className="flex items-center gap-2">
+                For the AI tailor
+                <span className="text-[11px] font-semibold text-ember bg-ember-tint px-2 py-0.5 rounded-full">recommended</span>
+              </span>
+            }
+          >
+            <p className="text-xs text-muted-foreground -mt-1">
+              Paste the job description now and Tailor Studio can write your materials the moment you need them.
+            </p>
             <FormField
               control={form.control}
-              name="dateApplied"
+              name="jobDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date Applied</FormLabel>
                   <FormControl>
-                    <Input type="date" data-testid="input-date-applied" {...field} />
+                    <Textarea
+                      placeholder="Paste the full job description here. This is used by the AI tailoring assistant to generate personalized resume bullets and cover letter content."
+                      rows={6}
+                      data-testid="textarea-job-description"
+                      className="rounded-[9px] bg-background leading-relaxed"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
+          </SectionCard>
 
-          <FormField
-            control={form.control}
-            name="followUpDate"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Follow-up Reminder Date</FormLabel>
-                <FormControl>
-                  <Input type="date" data-testid="input-follow-up-date" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <SectionCard title="Stay on top of it">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <FormField
+                control={form.control}
+                name="applicationMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Application Method</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Company site, Referral, Email..." data-testid="input-method" className="h-10 rounded-[9px] bg-background" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dateApplied"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-semibold text-muted-foreground">Date Applied</FormLabel>
+                    <FormControl>
+                      <Input type="date" data-testid="input-date-applied" className="h-10 rounded-[9px] bg-background" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Any additional notes — contacts, interview prep, context..."
-                    rows={3}
-                    data-testid="textarea-notes"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name="followUpDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-semibold text-muted-foreground">Follow-up Reminder Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" data-testid="input-follow-up-date" className="h-10 rounded-[9px] bg-background" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <div className="flex items-center gap-3 pt-2">
-            <Button type="submit" disabled={createApp.isPending} data-testid="button-submit">
-              {createApp.isPending ? "Saving..." : "Save Application"}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-semibold text-muted-foreground">Notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Any additional notes — contacts, interview prep, context..."
+                      rows={3}
+                      data-testid="textarea-notes"
+                      className="rounded-[9px] bg-background leading-relaxed"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </SectionCard>
+
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={createApp.isPending} className="h-[42px] rounded-[11px] font-bold px-5" data-testid="button-submit">
+              {createApp.isPending ? "Saving..." : "Save application"}
             </Button>
             <Link href="/">
-              <Button type="button" variant="outline" data-testid="button-cancel">
+              <Button type="button" variant="outline" className="h-[42px] rounded-[11px]" data-testid="button-cancel">
                 Cancel
               </Button>
             </Link>

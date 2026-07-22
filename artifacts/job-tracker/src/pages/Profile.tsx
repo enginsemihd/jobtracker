@@ -4,9 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useGetProfile, useUpsertProfile, useParseCv, getGetProfileQueryKey } from "@workspace/api-client-react";
-import { Save, Loader2, UserCircle, Info, Upload, FileText } from "lucide-react";
+import { Save, Loader2, Info, Upload, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,19 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+function FieldCard({ title, pill, hint, children }: { title: string; pill?: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-[14px] p-5 shadow-card">
+      <div className="flex items-center gap-2 mb-1">
+        <h2 className="text-[14.5px] font-bold text-foreground">{title}</h2>
+        {pill && <span className="text-[11px] font-semibold text-ember bg-ember-tint px-2 py-0.5 rounded-full">{pill}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">{hint}</p>
+      {children}
+    </div>
+  );
+}
 
 export default function Profile() {
   const queryClient = useQueryClient();
@@ -125,160 +138,159 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-6">
-      <div className="flex items-center gap-3 mb-2">
-        <UserCircle size={22} className="text-primary" />
-        <h1 className="text-xl font-semibold text-foreground">Your Profile</h1>
-      </div>
-      <p className="text-sm text-muted-foreground mb-6">
-        This information is used as context when the AI Tailoring Assistant generates tailored resume bullets, cover letter paragraphs, and ATS keywords for each job application.
+    <div className="max-w-[680px] mx-auto px-8 py-7 animate-rise">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Your story</h1>
+      <p className="text-sm text-muted-foreground mt-1 mb-5">
+        Everything Tailor Studio knows about you. The richer this is, the sharper your materials.
       </p>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6 flex items-start gap-2" data-testid="profile-ai-tip">
-        <Info size={14} className="text-amber-600 mt-0.5 shrink-0" />
-        <p className="text-xs text-amber-800">
+      <div className="bg-ochre-tint border border-ochre/20 rounded-[14px] p-3.5 mb-5 flex items-start gap-2" data-testid="profile-ai-tip">
+        <Info size={14} className="text-ochre mt-0.5 shrink-0" />
+        <p className="text-xs text-foreground">
           The more detail you provide — especially in your resume text and past roles — the more targeted and relevant the AI-generated content will be. At minimum, fill in your base resume text.
         </p>
       </div>
 
-      <div className="border border-dashed border-border rounded-lg p-4 mb-6" data-testid="cv-upload-section">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf"
-          className="hidden"
-          onChange={handleCvUpload}
-          data-testid="input-cv-file"
-        />
+      <div className="bg-card border border-border rounded-[14px] p-5 shadow-card mb-5" data-testid="cv-upload-section">
         <div className="flex items-center gap-3">
+          <span className="flex items-center justify-center w-11 h-11 rounded-[12px] bg-sage-tint text-sage shrink-0">
+            <FileText size={20} />
+          </span>
+          <div className="flex-1 min-w-0">
+            {uploadedFileName ? (
+              <p className="text-sm font-bold text-foreground truncate">{uploadedFileName}</p>
+            ) : (
+              <p className="text-sm font-bold text-foreground">Upload your CV</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {parseCv.isPending ? "Reading your CV…" : "Auto-fills the fields below — review and edit before saving."}
+            </p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={handleCvUpload}
+            data-testid="input-cv-file"
+          />
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="rounded-[10px] shrink-0"
             disabled={parseCv.isPending}
             onClick={() => fileInputRef.current?.click()}
             data-testid="button-upload-cv"
           >
             {parseCv.isPending ? (
-              <><Loader2 size={14} className="mr-2 animate-spin" /> Reading your CV…</>
+              <Loader2 size={14} className="animate-spin" />
             ) : (
-              <><Upload size={14} className="mr-2" /> Upload CV (PDF)</>
+              <><Upload size={14} className="mr-1.5" /> {uploadedFileName ? "Replace CV" : "Upload CV (PDF)"}</>
             )}
           </Button>
-          {uploadedFileName && !parseCv.isPending && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <FileText size={12} /> {uploadedFileName}
-            </span>
-          )}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Auto-fills the fields below from your resume — review and edit before saving. Can take up to 20 seconds. Or skip this and fill them in by hand.
-        </p>
       </div>
 
       {isLoading ? (
         <div className="space-y-4">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full rounded-[14px]" />
+          <Skeleton className="h-24 w-full rounded-[14px]" />
+          <Skeleton className="h-24 w-full rounded-[14px]" />
         </div>
       ) : (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" data-testid="form-profile">
-            <FormField
-              control={form.control}
-              name="resumeText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Base Resume Text *</FormLabel>
-                  <FormDescription>
-                    Paste your full resume text here. This is the most important field for AI tailoring.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Paste your complete resume text here — work experience, education, skills, etc..."
-                      rows={12}
-                      data-testid="textarea-resume"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4" data-testid="form-profile">
+            <FieldCard title="Base resume" pill="most important" hint="Paste your full resume text here. This is the most important field for AI tailoring.">
+              <FormField
+                control={form.control}
+                name="resumeText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Paste your complete resume text here — work experience, education, skills, etc..."
+                        rows={10}
+                        data-testid="textarea-resume"
+                        className="rounded-[9px] bg-background leading-relaxed"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldCard>
 
-            <FormField
-              control={form.control}
-              name="careerSummary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Career Summary / Bio</FormLabel>
-                  <FormDescription>
-                    A short paragraph describing your professional identity and goals.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      placeholder="A results-driven software engineer with 5 years of experience building..."
-                      rows={4}
-                      data-testid="textarea-career-summary"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FieldCard title="Career summary" hint="A short paragraph describing your professional identity and goals.">
+              <FormField
+                control={form.control}
+                name="careerSummary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="A results-driven software engineer with 5 years of experience building..."
+                        rows={3}
+                        data-testid="textarea-career-summary"
+                        className="rounded-[9px] bg-background leading-relaxed"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldCard>
 
-            <FormField
-              control={form.control}
-              name="keySkills"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Key Skills</FormLabel>
-                  <FormDescription>
-                    List your top skills. The AI uses this to highlight relevant expertise for each role.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      placeholder="TypeScript, React, Node.js, PostgreSQL, AWS, System Design, Agile..."
-                      rows={3}
-                      data-testid="textarea-skills"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FieldCard title="Key skills" hint="Used to compute match scores for job search and to highlight relevant expertise for each role.">
+              <FormField
+                control={form.control}
+                name="keySkills"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="TypeScript, React, Node.js, PostgreSQL, AWS, System Design, Agile..."
+                        rows={2}
+                        data-testid="textarea-skills"
+                        className="rounded-[9px] bg-background leading-relaxed"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldCard>
 
-            <FormField
-              control={form.control}
-              name="pastRoles"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Past Roles & Key Achievements</FormLabel>
-                  <FormDescription>
-                    Summarize your past roles and most impactful accomplishments. The AI uses this to pull relevant experience into tailored bullets.
-                  </FormDescription>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Senior Engineer at Acme (2021-2024): Led migration of monolith to microservices, reducing API latency by 40%. Built real-time analytics dashboard serving 500k users...&#10;&#10;Engineer at StartupXYZ (2019-2021): Built payment processing pipeline..."
-                      rows={8}
-                      data-testid="textarea-past-roles"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FieldCard title="Past roles & achievements" hint="The AI uses this to pull relevant experience into tailored bullets.">
+              <FormField
+                control={form.control}
+                name="pastRoles"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Senior Engineer at Acme (2021-2024): Led migration of monolith to microservices, reducing API latency by 40%. Built real-time analytics dashboard serving 500k users...&#10;&#10;Engineer at StartupXYZ (2019-2021): Built payment processing pipeline..."
+                        rows={6}
+                        data-testid="textarea-past-roles"
+                        className="rounded-[9px] bg-background leading-relaxed"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldCard>
 
-            <div className="flex items-center gap-3 pt-2">
-              <Button type="submit" disabled={upsertProfile.isPending} data-testid="button-save-profile">
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={upsertProfile.isPending} className="h-[42px] rounded-[11px] font-bold px-5" data-testid="button-save-profile">
                 {upsertProfile.isPending ? (
                   <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
                 ) : (
-                  <><Save size={14} className="mr-2" /> Save Profile</>
+                  <><Save size={14} className="mr-2" /> Save profile</>
                 )}
               </Button>
               {profile?.updatedAt && (

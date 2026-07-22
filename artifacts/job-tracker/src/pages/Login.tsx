@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,12 @@ import {
 } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+
+const BULLETS = [
+  "Search 10 job boards across Europe & Turkey at once",
+  "Resume bullets & cover letters tailored per application",
+  "Follow-up reminders that keep momentum going",
+];
 
 export default function Login() {
   const { login } = useAuth();
@@ -62,26 +68,53 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <Briefcase className="text-primary" size={26} />
-          <span className="text-xl font-semibold tracking-tight">JobTrack</span>
+    <div className="min-h-screen grid md:grid-cols-2 animate-rise">
+      {/* Marketing panel */}
+      <div
+        className="hidden md:flex flex-col justify-between p-11"
+        style={{ background: "linear-gradient(165deg, hsl(var(--sidebar)), hsl(var(--ember-tint)) 60%, hsl(var(--ember-tint-border)))" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center justify-center w-[34px] h-[34px] rounded-[10px] bg-ember text-primary-foreground">
+            <Briefcase size={18} />
+          </span>
+          <span className="font-display text-xl font-bold tracking-tight">JobTrack</span>
         </div>
-
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h1 className="text-lg font-semibold mb-1">
-            {mode === "login" ? "Sign in" : "Create account"}
+        <div>
+          <h1 className="font-display text-[42px] leading-[1.12] font-bold tracking-tight max-w-[420px] text-balance">
+            The job hunt is hard. Your tracker shouldn't be.
           </h1>
-          <p className="text-sm text-muted-foreground mb-5">
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground max-w-[400px] text-balance">
+            One calm place for every application — with AI-tailored materials, ten job boards in one search, and gentle reminders so nothing slips.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {BULLETS.map((bullet) => (
+            <div key={bullet} className="flex items-center gap-2 text-[13.5px] font-medium">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-sage text-primary-foreground shrink-0">
+                <Check size={11} strokeWidth={3} />
+              </span>
+              {bullet}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex items-center justify-center p-10">
+        <div className="w-full max-w-[360px]">
+          <h2 className="font-display text-2xl font-bold tracking-tight mb-1">
+            {mode === "login" ? "Welcome back" : "Create an account"}
+          </h2>
+          <p className="text-[14.5px] text-muted-foreground mb-6">
             {mode === "login"
-              ? "Welcome back. Enter your credentials."
+              ? "Pick up where you left off."
               : "Pick a username and password to get started."}
           </p>
 
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
+          <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="username" className="text-[13px] font-semibold text-muted-foreground">Username</Label>
               <Input
                 id="username"
                 autoComplete="username"
@@ -89,10 +122,11 @@ export default function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 data-testid="input-username"
+                className="h-11 rounded-[11px] focus-visible:border-ember"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="text-[13px] font-semibold text-muted-foreground">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -103,6 +137,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 data-testid="input-password"
+                className="h-11 rounded-[11px] focus-visible:border-ember"
               />
             </div>
 
@@ -114,7 +149,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-[46px] rounded-[11px] text-[14.5px] font-bold"
               disabled={pending}
               data-testid="button-submit"
             >
@@ -126,7 +161,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="my-4 flex items-center gap-3">
+          <div className="my-[18px] flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
             <span className="text-xs text-muted-foreground">or</span>
             <div className="h-px flex-1 bg-border" />
@@ -136,20 +171,20 @@ export default function Login() {
             <GoogleSignInButton onCredential={onGoogleCredential} />
           </div>
 
-          <div className="mt-4 text-center text-sm text-muted-foreground">
+          <div className="mt-[18px] text-center text-sm text-muted-foreground">
             {mode === "login" ? (
               <>
-                No account?{" "}
+                New here?{" "}
                 <button
                   type="button"
-                  className="text-primary hover:underline"
+                  className="text-ember font-semibold hover:underline"
                   onClick={() => {
                     setMode("register");
                     setError(null);
                   }}
                   data-testid="link-register"
                 >
-                  Create one
+                  Create an account
                 </button>
               </>
             ) : (
@@ -157,7 +192,7 @@ export default function Login() {
                 Have an account?{" "}
                 <button
                   type="button"
-                  className="text-primary hover:underline"
+                  className="text-ember font-semibold hover:underline"
                   onClick={() => {
                     setMode("login");
                     setError(null);
